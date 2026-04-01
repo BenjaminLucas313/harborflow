@@ -31,7 +31,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // =============================================================================
@@ -573,6 +572,7 @@ model CheckIn {
   checkedInAt       DateTime @default(now())
   notes             String?
 
+  company      Company     @relation(fields: [companyId], references: [id])
   reservation  Reservation @relation(fields: [reservationId], references: [id])
   trip         Trip        @relation(fields: [tripId], references: [id])
   checkedInBy  User        @relation("CheckInOperator", fields: [checkedInByUserId], references: [id])

@@ -1,0 +1,25 @@
+{
+  "auth": {
+    "login": {
+      "metaTitle": "Iniciar sesión — HarborFlow",
+      "pageTitle": "Iniciar sesión en HarborFlow",
+      "pageSubtitle": "Ingresa tu organización, correo y contraseña para continuar.",
+      "fields": {
+        "organisation": "Organización",
+        "email": "Correo electrónico",
+        "password": "Contraseña"
+      },
+      "placeholders": {
+        "organisation": "tu-organización",
+        "email": "tu@correo.com"
+      },
+      "actions": {
+        "submit": "Iniciar sesión",
+        "submitting": "Iniciando sesión…"
+      },
+      "errors": {
+        "invalidCredentials": "Credenciales inválidas. Verifica tu organización, correo y contraseña."
+      }
+    }
+  }
+}

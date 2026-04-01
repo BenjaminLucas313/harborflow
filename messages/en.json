@@ -1,0 +1,25 @@
+{
+  "auth": {
+    "login": {
+      "metaTitle": "Sign in — HarborFlow",
+      "pageTitle": "Sign in to HarborFlow",
+      "pageSubtitle": "Enter your organisation, email, and password to continue.",
+      "fields": {
+        "organisation": "Organisation",
+        "email": "Email address",
+        "password": "Password"
+      },
+      "placeholders": {
+        "organisation": "your-organisation",
+        "email": "you@example.com"
+      },
+      "actions": {
+        "submit": "Sign in",
+        "submitting": "Signing in…"
+      },
+      "errors": {
+        "invalidCredentials": "Invalid credentials. Please check your organisation, email, and password."
+      }
+    }
+  }
+}
