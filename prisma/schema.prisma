@@ -1,0 +1,675 @@
+// =============================================================================
+// HarborFlow — Prisma Schema V1
+// Multi-tenant launch reservation and operations platform
+//
+// DESIGN PRINCIPLES
+// -----------------
+// 1. Every tenant-owned entity carries companyId. Branch-scoped entities
+//    additionally carry branchId (sometimes denormalized for query efficiency).
+// 2. TripStatus does NOT include FULL. Full/availability is always derived
+//    by counting CONFIRMED + CHECKED_IN reservations against trip.capacity.
+//    Storing FULL creates desync risk on cancellation.
+// 3. Trip.capacity is a snapshot of Boat.capacity at trip creation time.
+//    This prevents boat edits from retroactively invalidating trip data.
+// 4. The single-active-reservation invariant is enforced at two levels:
+//    - application layer (eligibility check before write)
+//    - PostgreSQL partial unique index (see notes below schema)
+//    Prisma cannot express partial indexes natively; they live in a raw
+//    migration step annotated at the bottom of this file.
+// 5. PortStatus is an append-only event log. Current status = latest record
+//    for a branch ordered by createdAt DESC. No updatedAt.
+// 6. AuditLog is immutable. No updates, no deletes. actorId is nullable
+//    to support system-triggered events.
+// 7. The replacement chain on Reservation uses a self-referential relation.
+//    The NEW reservation stores replacesReservationId pointing to the OLD one.
+//    The unique constraint on that field prevents double-replacement.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+/// Roles are flat for V1. PASSENGER = public user. OPERATOR = port staff.
+/// ADMIN = company administrator with full management access.
+/// A platform super-admin (cross-company) is out of scope for V1.
+enum UserRole {
+  PASSENGER
+  OPERATOR
+  ADMIN
+}
+
+/// Operational lifecycle of a scheduled trip.
+/// FULL is intentionally absent — it is a derived state, not stored.
+/// BOARDING: operator has opened check-in. Reservations are still valid.
+/// DELAYED: trip departure pushed back. Reservations remain CONFIRMED.
+/// CANCELLED: terminal state. Downstream reservations are transitioned.
+/// DEPARTED / COMPLETED: terminal operational states.
+enum TripStatus {
+  SCHEDULED
+  BOARDING
+  DELAYED
+  CANCELLED
+  DEPARTED
+  COMPLETED
+}
+
+/// All status values that constitute an "active" reservation for the
+/// single-active-reservation invariant are: CONFIRMED, WAITLISTED, CHECKED_IN.
+/// REPLACED and CANCELLED are terminal and do not count.
+/// NO_SHOW is terminal and does not count.
+enum ReservationStatus {
+  CONFIRMED
+  WAITLISTED
+  REPLACED
+  CANCELLED
+  CHECKED_IN
+  NO_SHOW
+}
+
+/// Lifecycle of a waitlist position.
+/// PROMOTED: a CONFIRMED reservation was created from this entry.
+/// EXPIRED: trip was cancelled or departed before this entry was promoted.
+enum WaitlistStatus {
+  WAITING
+  PROMOTED
+  CANCELLED
+  EXPIRED
+}
+
+/// Operational state values for a port / branch.
+/// PARTIALLY_OPEN behavioral contract must be defined in application policy.
+/// In V1 it means: some services are available; operators must publish a
+/// notice clarifying scope. Reservation blocking is optional per closure.
+enum PortStatusValue {
+  OPEN
+  PARTIALLY_OPEN
+  CLOSED_WEATHER
+  CLOSED_MAINTENANCE
+  CLOSED_SECURITY
+  CLOSED_OTHER
+}
+
+/// Strongly-typed audit action catalog.
+/// Using an enum (vs free-text String) ensures audit queries are reliable
+/// and prevents typos from corrupting the audit trail.
+/// Adding new actions requires a schema migration — this is intentional.
+enum AuditAction {
+  // Reservation lifecycle
+  RESERVATION_CREATED
+  RESERVATION_REPLACED
+  RESERVATION_CANCELLED
+  RESERVATION_CHECKED_IN
+  RESERVATION_NO_SHOW
+  // Waitlist lifecycle
+  WAITLIST_JOINED
+  WAITLIST_PROMOTED
+  WAITLIST_CANCELLED
+  WAITLIST_EXPIRED
+  // Trip operations
+  TRIP_CREATED
+  TRIP_STATUS_CHANGED
+  TRIP_CAPACITY_CHANGED
+  // Port operations
+  PORT_STATUS_CHANGED
+  // Notices
+  NOTICE_CREATED
+  NOTICE_DEACTIVATED
+  // User / role management
+  USER_CREATED
+  USER_ROLE_CHANGED
+  USER_DEACTIVATED
+}
+
+// =============================================================================
+// TENANT LAYER — Company & Branch
+// =============================================================================
+
+/// Top-level tenant. All tenant-owned entities carry companyId.
+/// slug is URL-safe identifier used for routing/subdomain support.
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  /// URL-safe unique identifier (e.g. "harbor-norte"). Used for routing.
+  slug      String   @unique
+  logoUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations — every entity owned by this company
+  branches            Branch[]
+  users               User[]
+  boats               Boat[]
+  drivers             Driver[]
+  trips               Trip[]
+  reservations        Reservation[]
+  waitlistEntries     WaitlistEntry[]
+  portStatuses        PortStatus[]
+  operationalNotices  OperationalNotice[]
+  checkIns            CheckIn[]
+  auditLogs           AuditLog[]
+}
+
+/// Operational location (port / dock / service point) within a company.
+/// Branch is the scope for PortStatus, trips, boats, drivers, and notices.
+model Branch {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company            Company             @relation(fields: [companyId], references: [id])
+  boats              Boat[]
+  drivers            Driver[]
+  trips              Trip[]
+  portStatuses       PortStatus[]
+  operationalNotices OperationalNotice[]
+  users              User[]
+
+  @@index([companyId])
+}
+
+// =============================================================================
+// USER
+// =============================================================================
+
+/// Users are always scoped to a company.
+/// The same physical person at two different companies has two distinct accounts.
+/// Email uniqueness is enforced per company, not globally.
+///
+/// branchId is optional and primarily relevant for OPERATOR role users who
+/// are scoped to a specific branch. ADMIN users typically have company-wide
+/// access enforced at the application layer. PASSENGER users do not need it.
+model User {
+  id           String   @id @default(cuid())
+  companyId    String
+  /// Optional branch scope, primarily for OPERATOR role.
+  branchId     String?
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  phone        String?
+  role         UserRole @default(PASSENGER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company  Company @relation(fields: [companyId], references: [id])
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  reservations       Reservation[]
+  waitlistEntries    WaitlistEntry[]
+  checkInsPerformed  CheckIn[]          @relation("CheckInOperator")
+  portStatusChanges  PortStatus[]       @relation("PortStatusActor")
+  noticesCreated     OperationalNotice[]
+  auditLogsAsActor   AuditLog[]         @relation("AuditActor")
+
+  /// Email must be unique within a company (not globally).
+  @@unique([companyId, email])
+  @@index([companyId, role])
+  @@index([companyId, branchId])
+}
+
+// =============================================================================
+// FLEET — Boat & Driver
+// =============================================================================
+
+/// A vessel belonging to a company and assigned to a branch.
+/// capacity is the master value from which Trip.capacity is snapshotted.
+/// Changing capacity here does NOT retroactively change existing trips.
+model Boat {
+  id          String   @id @default(cuid())
+  companyId   String
+  branchId    String
+  name        String
+  /// Maximum passenger capacity for this vessel.
+  capacity    Int
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+  trips   Trip[]
+
+  @@index([companyId])
+  @@index([branchId])
+}
+
+/// A pilot / captain assigned to trips.
+model Driver {
+  id            String   @id @default(cuid())
+  companyId     String
+  branchId      String
+  firstName     String
+  lastName      String
+  licenseNumber String?
+  phone         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  branch  Branch  @relation(fields: [branchId], references: [id])
+  trips   Trip[]
+
+  @@index([companyId])
+  @@index([branchId])
+}
+
+// =============================================================================
+// TRIP
+// =============================================================================
+
+/// A scheduled departure. The core reservable unit.
+///
+/// capacity is a SNAPSHOT of boat.capacity at the time of trip creation.
+/// This is intentional: boat edits must not affect reservations already made.
+/// To change a trip's capacity after creation, use an explicit admin action
+/// that also validates it against existing confirmed reservation count.
+///
+/// waitlistEnabled: controls whether passengers can join a waitlist when full.
+/// statusReason: operator-visible note when changing status (e.g. cancellation reason).
+model Trip {
+  id                   String     @id @default(cuid())
+  companyId            String
+  branchId             String
+  boatId               String
+  driverId             String?
+  departureTime        DateTime
+  estimatedArrivalTime DateTime?
+  status               TripStatus @default(SCHEDULED)
+  /// Snapshot of boat.capacity at trip creation. See design note above.
+  capacity             Int
+  waitlistEnabled      Boolean    @default(true)
+  /// Optional note for status changes (cancellation reason, delay explanation, etc.)
+  statusReason         String?
+  notes                String?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  company            Company             @relation(fields: [companyId], references: [id])
+  branch             Branch              @relation(fields: [branchId], references: [id])
+  boat               Boat                @relation(fields: [boatId], references: [id])
+  driver             Driver?             @relation(fields: [driverId], references: [id])
+  reservations       Reservation[]
+  waitlistEntries    WaitlistEntry[]
+  operationalNotices OperationalNotice[]
+  checkIns           CheckIn[]
+
+  /// Primary query pattern: passenger-facing trip listing for a branch.
+  @@index([branchId, departureTime, status])
+  /// Admin/operator: all trips for a company in a time range.
+  @@index([companyId, departureTime])
+  /// Filtering by status across a company (e.g. all CANCELLED trips for metrics).
+  @@index([companyId, status])
+}
+
+// =============================================================================
+// RESERVATION
+// =============================================================================
+
+/// A passenger booking for a specific trip.
+///
+/// REPLACEMENT CHAIN
+/// -----------------
+/// When a passenger replaces their reservation:
+///   - A new Reservation is created with status CONFIRMED.
+///   - The new Reservation sets replacesReservationId = old.id
+///   - The old Reservation is updated to status REPLACED.
+///   - The @unique on replacesReservationId ensures a reservation can only
+///     be replaced once (one-to-one replacement chain).
+///   - The back-relation replacedByReservation on the OLD record lets you
+///     query "was this reservation replaced, and by which one?"
+///
+/// SINGLE ACTIVE RESERVATION INVARIANT
+/// ------------------------------------
+/// Enforced at two levels:
+///   1. Application-layer eligibility check before any write.
+///   2. Partial unique index in PostgreSQL (raw migration — see bottom of file):
+///      CREATE UNIQUE INDEX reservation_one_active_per_user
+///      ON "Reservation" ("userId", "companyId")
+///      WHERE status IN ('CONFIRMED', 'WAITLISTED', 'CHECKED_IN');
+///
+/// branchId is denormalized from trip for direct branch-scoped queries.
+///
+/// CAPACITY COUNTING
+/// -----------------
+/// Seats consumed = COUNT(*) WHERE tripId = X AND status IN ('CONFIRMED', 'CHECKED_IN')
+/// WAITLISTED reservations do NOT consume capacity.
+/// REPLACED and CANCELLED reservations do NOT consume capacity.
+model Reservation {
+  id        String            @id @default(cuid())
+  companyId String
+  /// Denormalized from trip.branchId for direct branch-scoped queries.
+  branchId  String
+  userId    String
+  tripId    String
+  status    ReservationStatus @default(CONFIRMED)
+
+  /// Set on the NEW reservation: which old reservation did this replace?
+  /// @unique enforces that each old reservation is replaced at most once.
+  replacesReservationId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  trip    Trip    @relation(fields: [tripId], references: [id])
+
+  /// The old reservation this one replaced (this is the NEW side of the chain).
+  replacesReservation   Reservation? @relation("ReplacementChain", fields: [replacesReservationId], references: [id])
+  /// The new reservation that replaced this one (this is the OLD side of the chain).
+  replacedByReservation Reservation? @relation("ReplacementChain")
+
+  /// Promotion tracking: if this reservation was created from a waitlist promotion.
+  promotedFromWaitlist WaitlistEntry? @relation("WaitlistPromotion")
+
+  checkIn CheckIn?
+
+  /// Core lookup: does this user have an active reservation? (see partial index note)
+  @@index([userId, status])
+  /// Capacity counting: how many seats are taken for this trip?
+  @@index([tripId, status])
+  /// Tenant-scoped user reservation lookup.
+  @@index([companyId, userId])
+  /// Operator manifest: all reservations for a trip in a company.
+  @@index([companyId, tripId])
+  /// Branch-scoped reservation queries.
+  @@index([branchId, status])
+}
+
+// =============================================================================
+// WAITLIST
+// =============================================================================
+
+/// A passenger's place in the queue for a full trip.
+///
+/// FIFO ORDERING
+/// -------------
+/// position is an explicit integer assigned at insertion time within a
+/// transaction: SELECT MAX(position) + 1 FROM WaitlistEntry WHERE tripId = X.
+/// Using an explicit position (vs relying on createdAt) prevents ordering
+/// ambiguity under concurrent insertions at the same millisecond.
+/// @@unique([tripId, position]) enforces no two entries share a position.
+///
+/// DEDUPLICATION
+/// -------------
+/// A user should not have two WAITING entries for the same trip.
+/// This is enforced by a partial unique index (raw migration):
+///   CREATE UNIQUE INDEX waitlist_one_waiting_per_user_per_trip
+///   ON "WaitlistEntry" ("userId", "tripId")
+///   WHERE status = 'WAITING';
+/// A full @@unique([userId, tripId]) would block rejoining after cancellation,
+/// which may be a valid V2 use case, so we use partial scoping.
+///
+/// PROMOTION
+/// ---------
+/// On promotion: WaitlistEntry.status = PROMOTED, promotedToReservationId = new.id
+/// On the Reservation: promotedFromWaitlist back-relation is readable.
+/// If promotee is ineligible at promotion time (e.g. already has active reservation),
+/// the entry must be CANCELLED and the next WAITING entry must be evaluated.
+///
+/// branchId is denormalized from trip for direct branch-scoped queries.
+model WaitlistEntry {
+  id        String        @id @default(cuid())
+  companyId String
+  /// Denormalized from trip.branchId.
+  branchId  String
+  userId    String
+  tripId    String
+  /// Explicit queue position within this trip. Assigned transactionally.
+  position  Int
+  status    WaitlistStatus @default(WAITING)
+
+  /// Set when promoted: which Reservation was created from this entry?
+  promotedToReservationId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  trip    Trip    @relation(fields: [tripId], references: [id])
+
+  /// The Reservation created when this entry was promoted.
+  promotedToReservation Reservation? @relation("WaitlistPromotion", fields: [promotedToReservationId], references: [id])
+
+  /// No two entries can hold the same queue position for the same trip.
+  @@unique([tripId, position])
+  /// Finding the next person in queue for a trip.
+  @@index([tripId, status, position])
+  /// User's own waitlist entries.
+  @@index([userId, status])
+  /// Tenant-scoped listing.
+  @@index([companyId, tripId])
+}
+
+// =============================================================================
+// PORT STATUS
+// =============================================================================
+
+/// Real-time operational state of a branch / port.
+///
+/// APPEND-ONLY EVENT LOG
+/// ---------------------
+/// Each status change creates a NEW record. Current status for a branch =
+/// most recent record ordered by createdAt DESC.
+/// This design preserves full closure history without needing a separate
+/// audit table for port state, and allows computing duration of closures.
+/// There is NO updatedAt — these records are immutable after creation.
+///
+/// RESERVATION BLOCKING
+/// --------------------
+/// Application policy: status values that are not OPEN must block new
+/// reservations for trips in this branch. PARTIALLY_OPEN blocking behavior
+/// is application-controlled and should be documented in policy config.
+///
+/// estimatedReopeningAt is optional but strongly recommended for passenger UX.
+model PortStatus {
+  id                   String          @id @default(cuid())
+  companyId            String
+  branchId             String
+  status               PortStatusValue @default(OPEN)
+  /// Public-facing message explaining the status. Required for any non-OPEN state.
+  message              String?
+  estimatedReopeningAt DateTime?
+  /// The operator or admin who triggered this status change.
+  setByUserId          String
+  /// Intentionally no updatedAt — this record is immutable after creation.
+  createdAt            DateTime        @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id])
+  branch    Branch  @relation(fields: [branchId], references: [id])
+  setByUser User    @relation("PortStatusActor", fields: [setByUserId], references: [id])
+
+  /// Primary lookup: current port status for a branch (latest record).
+  @@index([branchId, createdAt(sort: Desc)])
+  /// Company-wide port status history.
+  @@index([companyId, createdAt(sort: Desc)])
+}
+
+// =============================================================================
+// OPERATIONAL NOTICE
+// =============================================================================
+
+/// A public-facing message tied to a branch or a specific trip.
+/// Distinct from PortStatus: a notice carries richer content (title + body)
+/// and can be explicitly deactivated or expired.
+///
+/// tripId = null  → branch-wide notice (shown on all trip listings for the branch)
+/// tripId = set   → trip-specific notice (shown only on that trip's detail page)
+///
+/// When a port is closed, the system should create both a PortStatus entry
+/// AND an OperationalNotice so passengers see a visible, titled banner.
+model OperationalNotice {
+  id            String    @id @default(cuid())
+  companyId     String
+  branchId      String
+  /// null = branch-wide; populated = trip-specific notice.
+  tripId        String?
+  title         String
+  message       String
+  isActive      Boolean   @default(true)
+  /// Optional auto-expiry. Application should check this at query time.
+  expiresAt     DateTime?
+  createdByUserId String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id])
+  branch    Branch  @relation(fields: [branchId], references: [id])
+  trip      Trip?   @relation(fields: [tripId], references: [id])
+  createdBy User    @relation(fields: [createdByUserId], references: [id])
+
+  /// Active branch-wide notices (the most common UI query).
+  @@index([branchId, isActive])
+  /// Active notices for a specific trip.
+  @@index([tripId, isActive])
+  /// Admin/company-level notice listing.
+  @@index([companyId, isActive, createdAt(sort: Desc)])
+}
+
+// =============================================================================
+// CHECK-IN
+// =============================================================================
+
+/// Embarkation record for a passenger on a trip.
+/// One CheckIn per Reservation, enforced by @unique on reservationId.
+///
+/// Only reservations in CONFIRMED or CHECKED_IN status should be eligible
+/// for check-in. This is enforced at the application layer.
+/// CheckIn should only be permitted while Trip.status = BOARDING.
+///
+/// userId and tripId are denormalized from Reservation for manifest queries
+/// that must not require a JOIN through Reservation on the hot path.
+model CheckIn {
+  id                String   @id @default(cuid())
+  /// Tenant scope — denormalized for direct company-scoped queries.
+  companyId         String
+  /// One check-in per reservation. Enforced by @unique.
+  reservationId     String   @unique
+  /// Denormalized from reservation.tripId for manifest queries.
+  tripId            String
+  /// Denormalized from reservation.userId for manifest queries.
+  userId            String
+  /// The operator who performed the check-in.
+  checkedInByUserId String
+  checkedInAt       DateTime @default(now())
+  notes             String?
+
+  reservation  Reservation @relation(fields: [reservationId], references: [id])
+  trip         Trip        @relation(fields: [tripId], references: [id])
+  checkedInBy  User        @relation("CheckInOperator", fields: [checkedInByUserId], references: [id])
+
+  /// Operator manifest: all check-ins for a trip.
+  @@index([tripId])
+  /// Tenant-scoped trip manifest.
+  @@index([companyId, tripId])
+}
+
+// =============================================================================
+// AUDIT LOG
+// =============================================================================
+
+/// Immutable append-only record of all operationally significant actions.
+///
+/// IMMUTABILITY
+/// ------------
+/// No updatedAt. The application layer must never issue UPDATE or DELETE
+/// against this table. PostgreSQL row-level security should be considered
+/// in V2 to enforce this at the database layer.
+///
+/// actorId is nullable to support system-triggered events (e.g. auto-marking
+/// NO_SHOW on trip DEPARTED, auto-promoting waitlist entries).
+///
+/// payload stores a JSON snapshot of the relevant state at the time of the
+/// action. This is intentionally denormalized — it allows historical reads
+/// without reconstructing state from foreign key chains.
+///
+/// entityType + entityId provides a universal entity history lookup pattern:
+///   SELECT * FROM AuditLog WHERE entityType = 'Reservation' AND entityId = X
+model AuditLog {
+  id         String      @id @default(cuid())
+  companyId  String
+  /// Null for system-triggered events (e.g. auto-promotion, auto-no-show).
+  actorId    String?
+  action     AuditAction
+  /// Discriminator for the entity being acted upon (e.g. "Reservation", "Trip").
+  entityType String
+  entityId   String
+  /// JSON snapshot of relevant state at time of action.
+  payload    Json
+  /// Optional for traceability of human-initiated actions.
+  ipAddress  String?
+  /// Intentionally no updatedAt — this record is immutable.
+  createdAt  DateTime    @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id])
+
+  /// Entity history: all events for a specific record (e.g. one reservation's full lifecycle).
+  @@index([entityType, entityId])
+  /// Company-wide audit timeline, filterable by action.
+  @@index([companyId, action, createdAt(sort: Desc)])
+  /// Actor history: all actions by a specific user.
+  @@index([actorId, createdAt(sort: Desc)])
+  /// Time-ordered company audit feed.
+  @@index([companyId, createdAt(sort: Desc)])
+}
+
+// =============================================================================
+// RAW MIGRATION NOTES
+// =============================================================================
+//
+// The following constraints CANNOT be expressed in Prisma schema syntax.
+// They must be added as raw SQL in the generated migration file.
+//
+// ── 1. SINGLE ACTIVE RESERVATION INVARIANT ──────────────────────────────────
+//
+//   CREATE UNIQUE INDEX reservation_one_active_per_user
+//   ON "Reservation" ("userId", "companyId")
+//   WHERE status IN ('CONFIRMED', 'WAITLISTED', 'CHECKED_IN');
+//
+//   This is the database-level enforcement of the single-active-reservation
+//   business rule. It prevents duplicate active reservations even if the
+//   application layer has a bug or race condition.
+//
+// ── 2. WAITLIST DEDUPLICATION ────────────────────────────────────────────────
+//
+//   CREATE UNIQUE INDEX waitlist_one_waiting_per_user_per_trip
+//   ON "WaitlistEntry" ("userId", "tripId")
+//   WHERE status = 'WAITING';
+//
+//   Prevents a user from appearing twice in the same trip's active queue.
+//   Uses partial scope so a user can rejoin a waitlist after cancellation
+//   (a full @@unique would permanently block this).
+//
+// ── 3. TRIP CAPACITY ENFORCEMENT (APPLICATION-LAYER NOTE) ───────────────────
+//
+//   Capacity check at booking time must use:
+//     SELECT COUNT(*) FROM "Reservation"
+//     WHERE "tripId" = $tripId
+//     AND status IN ('CONFIRMED', 'CHECKED_IN')
+//     FOR UPDATE  -- or equivalent locking strategy
+//
+//   This query must be executed inside a transaction that includes the
+//   INSERT of the new Reservation. This prevents the last-seat race condition
+//   where two concurrent requests both read count < capacity and both succeed.
+//
+// =============================================================================
