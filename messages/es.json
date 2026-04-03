@@ -1,5 +1,9 @@
 {
   "auth": {
+    "logout": {
+      "signOut": "Cerrar sesión",
+      "signingOut": "Cerrando sesión…"
+    },
     "login": {
       "metaTitle": "Iniciar sesión — HarborFlow",
       "pageTitle": "Iniciar sesión en HarborFlow",

@@ -1,5 +1,9 @@
 {
   "auth": {
+    "logout": {
+      "signOut": "Sign out",
+      "signingOut": "Signing out…"
+    },
     "login": {
       "metaTitle": "Sign in — HarborFlow",
       "pageTitle": "Sign in to HarborFlow",

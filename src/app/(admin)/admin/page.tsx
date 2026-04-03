@@ -1,13 +1,34 @@
 // Admin dashboard at /admin.
-// Fleet, schedules, users, analytics, audit log.
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default function AdminPage() {
+import { auth } from "@/lib/auth";
+import { LogoutButton } from "@/components/auth/logout-button";
+
+export default async function AdminPage() {
+  const session = await auth();
+  if (!session) redirect("/login");
+
+  const { firstName, lastName, companyId } = session.user;
+
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Panel de administración</h1>
-      <nav className="mt-6">
+    <main className="mx-auto max-w-5xl px-4 py-8 space-y-8">
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Bienvenido, {firstName} {lastName}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Empresa: <span className="font-mono text-xs">{companyId}</span>
+          </p>
+        </div>
+        <LogoutButton />
+      </div>
+
+      {/* Navigation */}
+      <nav aria-label="Secciones">
         <ul className="space-y-2">
           <li>
             <Link
