@@ -20,6 +20,186 @@
       "errors": {
         "invalidCredentials": "Invalid credentials. Please check your organisation, email, and password."
       }
+    },
+    "register": {
+      "metaTitle": "Create account — HarborFlow",
+      "pageTitle": "Create your account",
+      "pageSubtitle": "Register as a passenger to start booking trips.",
+      "fields": {
+        "organisation": "Organisation",
+        "firstName": "First name",
+        "lastName": "Last name",
+        "email": "Email address",
+        "password": "Password"
+      },
+      "placeholders": {
+        "organisation": "your-organisation",
+        "firstName": "Jane",
+        "lastName": "Doe",
+        "email": "you@example.com"
+      },
+      "actions": {
+        "submit": "Create account",
+        "submitting": "Creating account…"
+      },
+      "errors": {
+        "emailAlreadyRegistered": "This email is already registered in this organisation.",
+        "companyNotFound": "Organisation not found. Check the identifier and try again.",
+        "unexpected": "Something went wrong. Please try again."
+      },
+      "footer": {
+        "hasAccount": "Already have an account?",
+        "signIn": "Sign in"
+      }
+    }
+  },
+  "reservations": {
+    "trips": {
+      "metaTitle": "Available trips — HarborFlow",
+      "pageTitle": "Available trips",
+      "empty": "No trips are available right now.",
+      "capacity": "capacity",
+      "waitlistAvailable": "Waitlist available"
+    },
+    "myReservations": {
+      "metaTitle": "My reservations — HarborFlow",
+      "pageTitle": "My reservations",
+      "empty": "You have no active reservations.",
+      "departure": "Departure",
+      "boat": "Vessel",
+      "status": "Status",
+      "waitlistPosition": "Position #{position} on waitlist"
+    },
+    "manifest": {
+      "metaTitle": "Manifest — HarborFlow",
+      "pageTitle": "Trip manifest",
+      "empty": "No passengers booked for this trip.",
+      "passenger": "Passenger",
+      "status": "Status",
+      "position": "Pos."
+    },
+    "actions": {
+      "reserve": "Reserve",
+      "reserving": "Reserving…"
+    },
+    "status": {
+      "CONFIRMED": "Confirmed",
+      "WAITLISTED": "Waitlisted",
+      "CHECKED_IN": "Checked in",
+      "REPLACED": "Replaced",
+      "CANCELLED": "Cancelled",
+      "NO_SHOW": "No-show"
+    },
+    "errors": {
+      "alreadyReserved": "You already have an active reservation. Cancel it before booking a new trip.",
+      "tripNotBookable": "This trip is no longer accepting reservations.",
+      "unexpected": "Something went wrong. Please try again."
+    },
+    "cancel": {
+      "cancelReservation": "Cancel reservation",
+      "leaveWaitlist": "Leave waitlist",
+      "cancelling": "Cancelling…",
+      "unexpected": "Could not cancel. Please try again."
+    }
+  },
+  "trips": {
+    "metaTitle": "Trips — HarborFlow",
+    "pageTitle": "Trips",
+    "createTrip": "New trip",
+    "noBranchAssigned": "Your account does not have a branch assigned. Contact the system administrator.",
+    "empty": "No trips scheduled for this branch.",
+    "list": {
+      "departure": "Departure",
+      "arrival": "Est. arrival",
+      "boat": "Vessel",
+      "driver": "Captain",
+      "capacity": "Capacity",
+      "status": "Status",
+      "noDriver": "Unassigned"
+    },
+    "status": {
+      "SCHEDULED": "Scheduled",
+      "BOARDING": "Boarding",
+      "DELAYED": "Delayed",
+      "CANCELLED": "Cancelled",
+      "DEPARTED": "Departed",
+      "COMPLETED": "Completed"
+    },
+    "form": {
+      "title": "Create trip",
+      "fields": {
+        "boat": "Vessel",
+        "driver": "Captain (optional)",
+        "departureTime": "Departure time",
+        "estimatedArrivalTime": "Estimated arrival (optional)",
+        "waitlistEnabled": "Enable waitlist",
+        "notes": "Notes (optional)"
+      },
+      "placeholders": {
+        "selectBoat": "Select a vessel",
+        "selectDriver": "No captain assigned",
+        "notes": "Operational notes…"
+      },
+      "actions": {
+        "submit": "Create trip",
+        "submitting": "Creating…",
+        "cancel": "Cancel"
+      },
+      "errors": {
+        "unexpected": "Something went wrong. Please try again.",
+        "noBoats": "No active vessels found for this branch. Register a vessel before creating trips."
+      }
+    }
+  },
+  "admin": {
+    "trips": {
+      "metaTitle": "Trips — Admin — HarborFlow",
+      "pageTitle": "Trips",
+      "createTrip": "New trip",
+      "noBranchAssigned": "Your account does not have a branch assigned. Contact the system administrator.",
+      "empty": "No trips scheduled for this branch.",
+      "list": {
+        "departure": "Departure",
+        "arrival": "Est. arrival",
+        "boat": "Vessel",
+        "driver": "Captain",
+        "capacity": "Capacity",
+        "status": "Status",
+        "noDriver": "Unassigned"
+      },
+      "status": {
+        "SCHEDULED": "Scheduled",
+        "BOARDING": "Boarding",
+        "DELAYED": "Delayed",
+        "CANCELLED": "Cancelled",
+        "DEPARTED": "Departed",
+        "COMPLETED": "Completed"
+      },
+      "form": {
+        "title": "Create trip",
+        "fields": {
+          "boat": "Vessel",
+          "driver": "Captain (optional)",
+          "departureTime": "Departure time",
+          "estimatedArrivalTime": "Estimated arrival (optional)",
+          "waitlistEnabled": "Enable waitlist",
+          "notes": "Notes (optional)"
+        },
+        "placeholders": {
+          "selectBoat": "Select a vessel",
+          "selectDriver": "No captain assigned",
+          "notes": "Operational notes…"
+        },
+        "actions": {
+          "submit": "Create trip",
+          "submitting": "Creating…",
+          "cancel": "Cancel"
+        },
+        "errors": {
+          "unexpected": "Something went wrong. Please try again.",
+          "noBoats": "No active vessels found for this branch. Register a vessel before creating trips."
+        }
+      }
     }
   }
 }

@@ -25,7 +25,9 @@ export type ErrorCode =
   | "TRIP_NOT_BOOKABLE"
   // Port
   | "PORT_CLOSED"
-  // Auth
+  // Auth / User
+  | "EMAIL_ALREADY_REGISTERED"
+  | "COMPANY_NOT_FOUND"
   | "UNAUTHORIZED"
   | "FORBIDDEN"
   // General

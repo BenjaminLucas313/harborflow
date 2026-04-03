@@ -1,4 +1,4 @@
-// Auth.js v5 configuration.
+// Auth.js v5 configuration — Node.js server only.
 //
 // Strategy: credentials-only + JWT sessions.
 //
@@ -8,15 +8,19 @@
 //   3. No OAuth or email verification in V1, so Account/VerificationToken tables are unnecessary.
 //
 // Requires AUTH_SECRET in .env (generate: openssl rand -base64 32).
+//
+// ⚠️  Do NOT import this file from middleware.ts or any Edge runtime path.
+//     Edge-safe auth config lives in auth.config.ts.
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import type { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { LoginSchema } from "@/modules/auth/schema";
+import { authConfig } from "@/lib/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   providers: [
     Credentials({
       // Field definitions used by the built-in sign-in page (not our custom UI).
@@ -75,40 +79,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-
-  session: { strategy: "jwt" },
-
-  callbacks: {
-    // Stamp custom claims onto the token at login time.
-    // `user` is only present on the first call (right after authorize returns).
-    jwt({ token, user }) {
-      if (user) {
-        token.companyId = user.companyId;
-        token.branchId = user.branchId ?? null;
-        token.firstName = user.firstName;
-        token.lastName = user.lastName;
-        token.role = user.role;
-      }
-      return token;
-    },
-
-    // Project token claims into the session object available to the app.
-    // token.sub is the user.id set automatically by Auth.js.
-    // Explicit casts are required here: the session callback's `token` parameter
-    // is typed as the base JWT (unknown claims) regardless of module augmentation.
-    // The values are safe — they were set in the jwt callback above.
-    session({ session, token }) {
-      session.user.id = token.sub!;
-      session.user.companyId = token.companyId as string;
-      session.user.branchId = token.branchId as string | null;
-      session.user.firstName = token.firstName as string;
-      session.user.lastName = token.lastName as string;
-      session.user.role = token.role as UserRole;
-      return session;
-    },
-  },
-
-  pages: {
-    signIn: "/login",
-  },
 });
