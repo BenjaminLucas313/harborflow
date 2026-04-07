@@ -1,11 +1,11 @@
 // Operator trip manifest — /operator/trips/[tripId]
-// Shows all passengers booked on a specific trip with their names,
-// reservation status, and waitlist position where applicable.
-// Accessible to OPERATOR and ADMIN (operator layout enforces this).
+// Shows all passengers booked on a specific trip.
 
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import { ChevronLeft, Ship } from "lucide-react";
 import { WaitlistStatus } from "@prisma/client";
 
 import { auth } from "@/lib/auth";
@@ -34,6 +34,7 @@ export default async function TripManifestPage({ params }: PageProps) {
     select: {
       id: true,
       departureTime: true,
+      capacity: true,
       boat: { select: { name: true } },
     },
   });
@@ -44,12 +45,13 @@ export default async function TripManifestPage({ params }: PageProps) {
 
   // Fetch passenger names — scoped to company to prevent cross-tenant leaks.
   const userIds = reservations.map((r) => r.userId);
-  const users = userIds.length > 0
-    ? await prisma.user.findMany({
-        where: { id: { in: userIds }, companyId },
-        select: { id: true, firstName: true, lastName: true },
-      })
-    : [];
+  const users =
+    userIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds }, companyId },
+          select: { id: true, firstName: true, lastName: true },
+        })
+      : [];
 
   const nameByUserId = new Map(
     users.map((u) => [u.id, `${u.firstName} ${u.lastName}`]),
@@ -82,7 +84,14 @@ export default async function TripManifestPage({ params }: PageProps) {
     waitlistPosition: positionByUserId.get(r.userId),
   }));
 
-  // Format the departure time for the heading.
+  // Counts for the header summary.
+  const confirmedCount = reservations.filter(
+    (r) => r.status === "CONFIRMED" || r.status === "CHECKED_IN",
+  ).length;
+  const waitlistedCount = reservations.filter(
+    (r) => r.status === "WAITLISTED",
+  ).length;
+
   const departure = trip.departureTime.toLocaleString("es", {
     weekday: "short",
     day: "2-digit",
@@ -94,14 +103,41 @@ export default async function TripManifestPage({ params }: PageProps) {
   });
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {t("pageTitle")}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {trip.boat.name} · {departure}
-        </p>
+    <main className="mx-auto max-w-3xl px-4 py-10 space-y-6">
+      {/* Back link */}
+      <Link
+        href="/operator/trips"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ChevronLeft className="size-3.5" aria-hidden="true" />
+        Back to trips
+      </Link>
+
+      {/* Trip header */}
+      <div className="flex items-start gap-4 flex-wrap justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {t("pageTitle")}
+          </h1>
+          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+            <Ship className="size-4 shrink-0" aria-hidden="true" />
+            <span>
+              {trip.boat.name} · {departure}
+            </span>
+          </div>
+        </div>
+
+        {/* Occupancy summary */}
+        <div className="flex items-center gap-3 text-sm">
+          <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2.5 py-0.5 text-xs font-medium">
+            {confirmedCount} / {trip.capacity} confirmed
+          </span>
+          {waitlistedCount > 0 && (
+            <span className="inline-flex items-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2.5 py-0.5 text-xs font-medium">
+              {waitlistedCount} waitlisted
+            </span>
+          )}
+        </div>
       </div>
 
       <Manifest entries={entries} />

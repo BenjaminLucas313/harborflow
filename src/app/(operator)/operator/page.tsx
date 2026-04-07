@@ -2,43 +2,44 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClipboardList } from "lucide-react";
 
 import { auth } from "@/lib/auth";
-import { LogoutButton } from "@/components/auth/logout-button";
 
 export default async function OperatorPage() {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const { firstName, lastName, companyId } = session.user;
+  const { firstName } = session.user;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 space-y-8">
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Bienvenido, {firstName} {lastName}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Empresa: <span className="font-mono text-xs">{companyId}</span>
-          </p>
-        </div>
-        <LogoutButton />
+    <main className="mx-auto max-w-5xl px-4 py-10 space-y-8">
+      {/* Greeting */}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Welcome back, {firstName}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage your branch operations.
+        </p>
       </div>
 
-      {/* Navigation */}
-      <nav aria-label="Secciones">
-        <ul className="space-y-2">
-          <li>
-            <Link
-              href="/operator/trips"
-              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-            >
-              Viajes →
-            </Link>
-          </li>
-        </ul>
+      {/* Navigation cards */}
+      <nav aria-label="Secciones" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Link
+          href="/operator/trips"
+          className="group flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm transition-all duration-150 hover:shadow-md hover:border-primary/30"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-primary/10 p-2.5 transition-colors group-hover:bg-primary/15">
+              <ClipboardList className="size-5 text-primary" aria-hidden="true" />
+            </div>
+            <h2 className="font-semibold">Viajes</h2>
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            View trip schedule and access passenger manifests.
+          </p>
+        </Link>
       </nav>
     </main>
   );

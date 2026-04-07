@@ -62,8 +62,9 @@
       "metaTitle": "Available trips — HarborFlow",
       "pageTitle": "Available trips",
       "empty": "No trips are available right now.",
-      "capacity": "capacity",
-      "waitlistAvailable": "Waitlist available"
+      "capacity": "seats",
+      "waitlistAvailable": "Waitlist available",
+      "full": "Full"
     },
     "myReservations": {
       "metaTitle": "My reservations — HarborFlow",
@@ -84,7 +85,9 @@
     },
     "actions": {
       "reserve": "Reserve",
-      "reserving": "Reserving…"
+      "reserving": "Reserving…",
+      "joinWaitlist": "Join waitlist",
+      "joining": "Joining…"
     },
     "status": {
       "CONFIRMED": "Confirmed",

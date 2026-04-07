@@ -3,10 +3,11 @@
 // waitlist position where applicable.
 
 import { getTranslations } from "next-intl/server";
+import { Users } from "lucide-react";
 import type { ReservationRow } from "@/modules/reservations/repository";
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Status badge classes
 // ---------------------------------------------------------------------------
 
 const STATUS_CLASSES: Record<string, string> = {
@@ -19,7 +20,7 @@ const STATUS_CLASSES: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Component
+// Types
 // ---------------------------------------------------------------------------
 
 export type ManifestEntry = ReservationRow & {
@@ -30,19 +31,31 @@ export type ManifestEntry = ReservationRow & {
 
 type Props = { entries: ManifestEntry[] };
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export async function Manifest({ entries }: Props) {
   const t = await getTranslations("reservations");
 
   if (entries.length === 0) {
     return (
-      <p className="rounded-xl border border-border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
-        {t("manifest.empty")}
-      </p>
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card px-6 py-14 text-center">
+        <div className="rounded-full bg-muted p-4 mb-4">
+          <Users
+            className="size-7 text-muted-foreground/50"
+            aria-hidden="true"
+          />
+        </div>
+        <p className="text-sm font-medium text-muted-foreground">
+          {t("manifest.empty")}
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       {/* Mobile: card stack */}
       <ul className="divide-y divide-border sm:hidden" role="list">
         {entries.map((e) => {
@@ -72,7 +85,7 @@ export async function Manifest({ entries }: Props) {
       {/* Desktop: table */}
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="border-b border-border">
+          <thead className="border-b border-border bg-muted/30">
             <tr>
               <th
                 scope="col"
@@ -100,7 +113,10 @@ export async function Manifest({ entries }: Props) {
                 STATUS_CLASSES[e.status] ?? "bg-muted text-muted-foreground";
 
               return (
-                <tr key={e.id} className="hover:bg-muted/40 transition-colors">
+                <tr
+                  key={e.id}
+                  className="hover:bg-muted/40 transition-colors"
+                >
                   <td className="px-4 py-3 font-medium">{e.passengerName}</td>
                   <td className="px-4 py-3">
                     <span

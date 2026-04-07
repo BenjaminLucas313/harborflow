@@ -62,8 +62,9 @@
       "metaTitle": "Viajes disponibles — HarborFlow",
       "pageTitle": "Viajes disponibles",
       "empty": "No hay viajes disponibles en este momento.",
-      "capacity": "capacidad",
-      "waitlistAvailable": "Lista de espera disponible"
+      "capacity": "asientos",
+      "waitlistAvailable": "Lista de espera disponible",
+      "full": "Lleno"
     },
     "myReservations": {
       "metaTitle": "Mis reservas — HarborFlow",
@@ -84,7 +85,9 @@
     },
     "actions": {
       "reserve": "Reservar",
-      "reserving": "Reservando…"
+      "reserving": "Reservando…",
+      "joinWaitlist": "Unirse a lista",
+      "joining": "Uniéndose…"
     },
     "status": {
       "CONFIRMED": "Confirmado",

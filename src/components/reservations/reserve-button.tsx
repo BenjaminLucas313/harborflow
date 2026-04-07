@@ -1,15 +1,12 @@
 "use client";
 
-// Reserve button shown on each trip row in the passenger trip list.
+// Reserve button shown on each trip card in the passenger trip list.
 //
 // States:
-//   null status   → "Reserve" button, enabled
-//   CONFIRMED     → green badge, no button
-//   WAITLISTED    → amber badge, no button
-//   Any other     → muted badge, no button
-//
-// On success the page is refreshed via router.refresh() so the server component
-// re-fetches the updated reservation status.
+//   reservationStatus !== null → status badge (CONFIRMED / WAITLISTED / CHECKED_IN)
+//   isFull && !waitlistEnabled → disabled "Full" pill
+//   isFull && waitlistEnabled  → "Join waitlist" button
+//   otherwise                 → "Reserve" button
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -23,7 +20,7 @@ import { Button } from "@/components/ui/button";
 // Status badge
 // ---------------------------------------------------------------------------
 
-const STATUS_BADGE: Record<
+const STATUS_BADGE_CLASSES: Record<
   Extract<ReservationStatus, "CONFIRMED" | "WAITLISTED" | "CHECKED_IN">,
   string
 > = {
@@ -43,12 +40,12 @@ function ReservationBadge({
   label: string;
 }) {
   const classes =
-    STATUS_BADGE[status as keyof typeof STATUS_BADGE] ??
+    STATUS_BADGE_CLASSES[status as keyof typeof STATUS_BADGE_CLASSES] ??
     "bg-muted text-muted-foreground";
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${classes}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${classes}`}
     >
       {label}
     </span>
@@ -63,23 +60,45 @@ type Props = {
   tripId: string;
   /** null when the passenger has no active reservation for this trip. */
   reservationStatus: ReservationStatus | null;
+  /** Waitlist queue position — only set when reservationStatus === "WAITLISTED". */
+  waitlistPosition?: number | null;
+  /** Whether all confirmed+checked-in seats are taken. */
+  isFull: boolean;
+  /** Whether the trip has waitlist enabled. */
+  waitlistEnabled: boolean;
 };
 
-export function ReserveButton({ tripId, reservationStatus }: Props) {
+export function ReserveButton({
+  tripId,
+  reservationStatus,
+  waitlistPosition,
+  isFull,
+  waitlistEnabled,
+}: Props) {
   const t = useTranslations("reservations");
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Already reserved — show status badge instead of a button.
+  // Already booked — show status badge, with position for waitlisted entries.
   if (reservationStatus !== null) {
+    const label =
+      reservationStatus === "WAITLISTED" && waitlistPosition != null
+        ? `${t(`status.${reservationStatus}`)} #${waitlistPosition}`
+        : t(`status.${reservationStatus}`);
+    return <ReservationBadge status={reservationStatus} label={label} />;
+  }
+
+  // Full and no waitlist — non-interactive pill.
+  if (isFull && !waitlistEnabled) {
     return (
-      <ReservationBadge
-        status={reservationStatus}
-        label={t(`status.${reservationStatus}`)}
-      />
+      <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-muted text-muted-foreground">
+        {t("trips.full")}
+      </span>
     );
   }
+
+  const isWaitlist = isFull && waitlistEnabled;
 
   const handleReserve = async () => {
     setSubmitting(true);
@@ -103,7 +122,8 @@ export function ReserveButton({ tripId, reservationStatus }: Props) {
         setError(t("errors.alreadyReserved"));
       } else if (
         data.code === "TRIP_NOT_BOOKABLE" ||
-        data.code === "TRIP_NOT_FOUND"
+        data.code === "TRIP_NOT_FOUND" ||
+        data.code === "WAITLIST_NOT_ENABLED"
       ) {
         setError(t("errors.tripNotBookable"));
       } else {
@@ -117,13 +137,29 @@ export function ReserveButton({ tripId, reservationStatus }: Props) {
   };
 
   return (
-    <div className="flex flex-col items-start gap-1">
-      <Button size="sm" onClick={handleReserve} disabled={submitting}>
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        size="sm"
+        variant={isWaitlist ? "outline" : "default"}
+        onClick={handleReserve}
+        disabled={submitting}
+        className={
+          isWaitlist
+            ? "border-amber-400 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/20"
+            : undefined
+        }
+      >
         {submitting && <Loader2 className="animate-spin" aria-hidden="true" />}
-        {submitting ? t("actions.reserving") : t("actions.reserve")}
+        {submitting
+          ? isWaitlist
+            ? t("actions.joining")
+            : t("actions.reserving")
+          : isWaitlist
+            ? t("actions.joinWaitlist")
+            : t("actions.reserve")}
       </Button>
       {error && (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-destructive text-right max-w-[180px]">
           {error}
         </p>
       )}

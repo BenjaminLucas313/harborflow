@@ -1,10 +1,11 @@
 // Server layout — second gate for the operator section.
-// Allows OPERATOR and ADMIN roles; all other roles are sent to their own dashboard.
-// ADMINs have full company access and may use operator views (manifests, check-in, etc.).
+// Allows OPERATOR and ADMIN roles. Also renders the shared AppNav.
 
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { dashboardForRole } from "@/lib/routes";
 import { redirect } from "next/navigation";
+import { AppNav } from "@/components/layout/app-nav";
 
 export default async function OperatorLayout({
   children,
@@ -12,13 +13,28 @@ export default async function OperatorLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-
   if (!session) redirect("/login");
 
-  const { role } = session.user;
+  const { role, firstName, lastName, companyId } = session.user;
   if (role !== "OPERATOR" && role !== "ADMIN") {
     redirect(dashboardForRole(role));
   }
 
-  return <>{children}</>;
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { name: true },
+  });
+
+  return (
+    <div className="min-h-screen bg-background">
+      <AppNav
+        firstName={firstName}
+        lastName={lastName}
+        role={role}
+        companyName={company?.name}
+        homeHref="/operator"
+      />
+      {children}
+    </div>
+  );
 }
