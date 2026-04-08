@@ -26,9 +26,10 @@ export async function DELETE(
     );
   }
 
-  if (session.user.role !== "PASSENGER") {
+  // V2: EMPLOYEE is the equivalent of the V1 PASSENGER role.
+  if (session.user.role !== "EMPLOYEE") {
     return NextResponse.json(
-      { code: "FORBIDDEN", message: "Only passengers can leave a waitlist." },
+      { code: "FORBIDDEN", message: "Only employees can leave a waitlist." },
       { status: 403 },
     );
   }

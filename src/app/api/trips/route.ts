@@ -4,7 +4,7 @@
 //     date      string   optional  YYYY-MM-DD — filters to that calendar day (UTC)
 //     status    string   optional  TripStatus enum value — overrides the default non-terminal filter
 //
-// POST /api/trips — create a trip (ADMIN only)
+// POST /api/trips — create a trip (PROVIDER only)
 //   Body: CreateTripSchema fields (companyId is ignored from body — taken from session)
 //
 // Business logic lives in modules/trips/service.ts.
@@ -94,9 +94,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  if (session.user.role !== "ADMIN") {
+  if (session.user.role !== "PROVIDER") {
     return NextResponse.json(
-      { code: "FORBIDDEN", message: "Only administrators can create trips." },
+      { code: "FORBIDDEN", message: "Only the provider can create trips." },
       { status: 403 },
     );
   }

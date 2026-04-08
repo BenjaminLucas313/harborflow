@@ -52,6 +52,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             email: true,
             companyId: true,
             branchId: true,
+            // departmentId: stamped into JWT for UABL_STAFF role-scoping.
+            departmentId: true,
             firstName: true,
             lastName: true,
             passwordHash: true,
@@ -72,6 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           companyId: user.companyId,
           branchId: user.branchId,
+          departmentId: user.departmentId,
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,

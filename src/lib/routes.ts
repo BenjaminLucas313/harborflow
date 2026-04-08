@@ -5,16 +5,17 @@
 import type { UserRole } from "@prisma/client";
 
 /** Routes that are always reachable without authentication. */
-export const PUBLIC_ROUTES: string[] = ["/", "/login", "/register"];
+export const PUBLIC_ROUTES: string[] = ["/", "/login"];
 
 /** The fallback path when an unauthenticated user hits a protected route. */
 export const LOGIN_PATH = "/login";
 
 /** Root path for each role's dashboard. */
 export const ROLE_DASHBOARD: Record<UserRole, string> = {
-  PASSENGER: "/passenger",
-  OPERATOR: "/operator",
-  ADMIN: "/admin",
+  EMPLOYEE:    "/employee",
+  COMPANY_REP: "/company",
+  UABL_STAFF:  "/uabl",
+  PROVIDER:    "/provider",
 };
 
 /**
@@ -30,20 +31,18 @@ export function dashboardForRole(role: UserRole): string {
  * Used in middleware to decide whether to redirect a user who is authenticated
  * but accessing the wrong role's section.
  *
- * ADMINs have company-wide access and may visit any protected section
- * (operator manifest, passenger overview, etc.). Individual layouts impose
- * their own finer-grained checks for sections that restrict ADMIN entry.
+ * PROVIDER has fleet-wide oversight and can access any section.
  *
  * Examples:
- *   isAllowedPath("ADMIN",     "/admin/users")    → true
- *   isAllowedPath("ADMIN",     "/operator/trips") → true  (admin has full access)
- *   isAllowedPath("OPERATOR",  "/operator/trips") → true
- *   isAllowedPath("OPERATOR",  "/admin/users")    → false
- *   isAllowedPath("PASSENGER", "/operator")       → false
+ *   isAllowedPath("PROVIDER",    "/uabl/metrics")    → true  (provider has full access)
+ *   isAllowedPath("UABL_STAFF",  "/uabl/trips")      → true
+ *   isAllowedPath("UABL_STAFF",  "/company/trips")   → false
+ *   isAllowedPath("COMPANY_REP", "/company/trips")   → true
+ *   isAllowedPath("EMPLOYEE",    "/company")         → false
  */
 export function isAllowedPath(role: UserRole, pathname: string): boolean {
-  // Admins have company-wide access — never blocked by role-path checks.
-  if (role === "ADMIN") return true;
+  // Provider has system-wide oversight access.
+  if (role === "PROVIDER") return true;
 
   const dashboard = ROLE_DASHBOARD[role];
   // Root dashboard exact match OR any sub-path.

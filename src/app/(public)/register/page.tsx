@@ -1,32 +1,24 @@
-import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
-import { RegisterForm } from "@/components/auth/register-form";
+// V2: Public self-registration is disabled.
+// Employee accounts are created by administrators.
+import Link from "next/link";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations("auth.register");
-  return { title: t("metaTitle") };
-}
+export const metadata = { title: "Registro no disponible" };
 
-export default async function RegisterPage() {
-  const t = await getTranslations("auth.register");
-
+export default function RegisterPage() {
   return (
     <main className="flex min-h-svh items-center justify-center bg-muted/40 px-4 py-12">
-      <div className="w-full max-w-sm">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {t("pageTitle")}
-          </h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            {t("pageSubtitle")}
-          </p>
-        </div>
-
-        {/* Form card */}
-        <div className="rounded-xl border border-border bg-card px-6 py-8 shadow-sm">
-          <RegisterForm />
-        </div>
+      <div className="w-full max-w-sm text-center space-y-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Registro no disponible</h1>
+        <p className="text-sm text-muted-foreground">
+          Las cuentas son creadas por los administradores del sistema. Si necesitás acceso,
+          contactá a tu empresa o a la autoridad del puerto.
+        </p>
+        <Link
+          href="/login"
+          className="inline-block rounded-lg bg-gray-900 px-5 py-2 text-sm font-medium text-white hover:bg-gray-700"
+        >
+          Ir al inicio de sesión
+        </Link>
       </div>
     </main>
   );

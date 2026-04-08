@@ -23,9 +23,10 @@ export async function DELETE(
     );
   }
 
-  if (session.user.role !== "PASSENGER") {
+  // V2: EMPLOYEE is the equivalent of the V1 PASSENGER role.
+  if (session.user.role !== "EMPLOYEE") {
     return NextResponse.json(
-      { code: "FORBIDDEN", message: "Only passengers can cancel their own reservations." },
+      { code: "FORBIDDEN", message: "Only employees can cancel their own reservations." },
       { status: 403 },
     );
   }

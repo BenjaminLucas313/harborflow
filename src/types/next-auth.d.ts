@@ -11,6 +11,8 @@ declare module "next-auth" {
       id: string;
       companyId: string;
       branchId: string | null;
+      /** Present only for UABL_STAFF users. Scopes confirmation authority. */
+      departmentId: string | null;
       firstName: string;
       lastName: string;
       role: UserRole;
@@ -21,6 +23,8 @@ declare module "next-auth" {
   interface User {
     companyId: string;
     branchId: string | null;
+    /** Present only for UABL_STAFF users. */
+    departmentId: string | null;
     firstName: string;
     lastName: string;
     role: UserRole;
@@ -32,6 +36,8 @@ declare module "next-auth/jwt" {
   interface JWT {
     companyId: string;
     branchId: string | null;
+    /** Present only for UABL_STAFF users. */
+    departmentId: string | null;
     firstName: string;
     lastName: string;
     role: UserRole;

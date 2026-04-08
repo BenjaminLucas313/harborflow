@@ -10,7 +10,7 @@ export const CreateUserSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   phone: z.string().optional(),
-  role: z.enum(Object.values(UserRole) as [string, ...string[]]).default(UserRole.PASSENGER),
+  role: z.enum(Object.values(UserRole) as [string, ...string[]]).default(UserRole.EMPLOYEE),
 });
 
 export const UpdateUserSchema = CreateUserSchema.partial().omit({ companyId: true, password: true });

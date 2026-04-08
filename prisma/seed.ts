@@ -1,16 +1,24 @@
 // =============================================================================
-// HarborFlow — Development Seed
+// HarborFlow — Development Seed (V2)
 // =============================================================================
 //
-// Creates a minimal but complete dataset for end-to-end testing:
-//   - 1 Company  (slug: "harbor-norte")
-//   - 1 Branch   (Porto Norte)
-//   - 1 Boat     (capacity: 2 — intentionally small to force waitlist testing)
-//   - 1 Driver
-//   - 3 Users:   passenger / operator (branch-scoped) / admin (branch-scoped)
-//   - 3 Trips:   future dates, capacity 2, waitlist enabled
+// Creates a complete dataset for end-to-end testing of the V2 role system:
 //
-// IDEMPOTENT: uses upsert on every record — safe to re-run.
+//   ORGANIZATIONS:
+//   - 1 Provider Company  (slug: "lanchas-rosario")  — PROVIDER user
+//   - 1 UABL Company      (slug: "uabl")             — UABL_STAFF users
+//   - 2 Employer Companies (slug: "empresa-alfa", "empresa-beta") — COMPANY_REP + EMPLOYEE users
+//
+//   UABL STRUCTURE:
+//   - 3 Departments with WorkTypes each
+//
+//   FLEET (under Provider):
+//   - 1 Branch (Puerto Rosario)
+//   - 2 Boats (capacity 20 each)
+//   - 1 Driver
+//   - 3 Trips
+//
+// IDEMPOTENT: safe to re-run.
 //
 // Run:
 //   npx prisma db seed
@@ -20,7 +28,7 @@
 // =============================================================================
 
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Company } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
@@ -32,39 +40,7 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// ---------------------------------------------------------------------------
-// Credentials (change before any non-local use)
-// ---------------------------------------------------------------------------
-
-const COMPANY_SLUG = "harbor-norte";
-
-const USERS = {
-  passenger: {
-    email: "passenger@harbor-norte.dev",
-    password: "passenger123",
-    firstName: "Ana",
-    lastName: "Costa",
-    role: "PASSENGER" as const,
-  },
-  operator: {
-    email: "operator@harbor-norte.dev",
-    password: "operator123",
-    firstName: "Carlos",
-    lastName: "Mendes",
-    role: "OPERATOR" as const,
-  },
-  admin: {
-    email: "admin@harbor-norte.dev",
-    password: "admin123",
-    firstName: "Sofia",
-    lastName: "Alves",
-    role: "ADMIN" as const,
-  },
-} as const;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const ROUNDS = 10; // bcrypt rounds (10 = fast for dev)
 
 /** Returns a Date set to HH:MM UTC on a day offset from today. */
 function futureDate(dayOffset: number, hour: number, minute = 0): Date {
@@ -74,176 +50,313 @@ function futureDate(dayOffset: number, hour: number, minute = 0): Date {
   return d;
 }
 
-// ---------------------------------------------------------------------------
-// Seed
-// ---------------------------------------------------------------------------
-
-async function main() {
-  console.log("🌱 Seeding HarborFlow development data…\n");
-
-  // ── 1. Company ──────────────────────────────────────────────────────────
-  const company = await prisma.company.upsert({
-    where: { slug: COMPANY_SLUG },
+async function upsertCompany(slug: string, name: string): Promise<Company> {
+  return prisma.company.upsert({
+    where: { slug },
     update: {},
+    create: { name, slug, isActive: true },
+  });
+}
+
+async function upsertUser(data: {
+  companyId: string;
+  branchId?: string;
+  departmentId?: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: "EMPLOYEE" | "COMPANY_REP" | "UABL_STAFF" | "PROVIDER";
+}) {
+  const passwordHash = await bcrypt.hash(data.password, ROUNDS);
+  return prisma.user.upsert({
+    where: { companyId_email: { companyId: data.companyId, email: data.email } },
+    update: { departmentId: data.departmentId ?? null },
     create: {
-      name: "Harbor Norte",
-      slug: COMPANY_SLUG,
+      companyId: data.companyId,
+      branchId: data.branchId,
+      departmentId: data.departmentId,
+      email: data.email,
+      passwordHash,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: data.role,
       isActive: true,
     },
   });
-  console.log(`✓ Company   : ${company.name} (slug: ${company.slug})`);
+}
 
-  // ── 2. Branch ───────────────────────────────────────────────────────────
-  // Upsert by name+companyId (no unique constraint exists on name alone,
-  // so we use findFirst + create to stay idempotent).
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+async function main() {
+  console.log("🌱 Seeding HarborFlow V2 development data…\n");
+
+  // =========================================================================
+  // 1. Companies
+  // =========================================================================
+
+  const providerCompany = await upsertCompany("lanchas-rosario", "Lanchas Rosario S.A.");
+  const uablCompany     = await upsertCompany("uabl", "UABL - Unión Argentina de Barcos de Lanchas");
+  const empresaAlfa     = await upsertCompany("empresa-alfa", "Empresa Alfa S.R.L.");
+  const empresaBeta     = await upsertCompany("empresa-beta", "Empresa Beta S.A.");
+
+  console.log(`✓ Companies: ${providerCompany.name}, ${uablCompany.name}, ${empresaAlfa.name}, ${empresaBeta.name}`);
+
+  // =========================================================================
+  // 2. Branch (under Provider)
+  // =========================================================================
+
   let branch = await prisma.branch.findFirst({
-    where: { companyId: company.id, name: "Porto Norte" },
+    where: { companyId: providerCompany.id, name: "Puerto Rosario" },
   });
   if (!branch) {
     branch = await prisma.branch.create({
       data: {
-        companyId: company.id,
-        name: "Porto Norte",
-        address: "Cais 1, Porto Norte",
+        companyId: providerCompany.id,
+        name: "Puerto Rosario",
+        address: "Av. Belgrano 1000, Rosario, Santa Fe",
         isActive: true,
       },
     });
   }
-  console.log(`✓ Branch    : ${branch.name} (id: ${branch.id})`);
+  console.log(`✓ Branch: ${branch.name}`);
 
-  // ── 3. Boat ─────────────────────────────────────────────────────────────
-  // Capacity = 2 → trips will fill after 2 bookings, enabling waitlist tests.
-  let boat = await prisma.boat.findFirst({
-    where: { companyId: company.id, branchId: branch.id, name: "Barco Alpha" },
+  // =========================================================================
+  // 3. UABL Departments and WorkTypes
+  // =========================================================================
+
+  async function upsertDepartment(name: string) {
+    let dept = await prisma.department.findFirst({ where: { name } });
+    if (!dept) {
+      dept = await prisma.department.create({ data: { name, isActive: true } });
+    }
+    return dept;
+  }
+
+  async function upsertWorkType(departmentId: string, name: string) {
+    let wt = await prisma.workType.findFirst({ where: { departmentId, name } });
+    if (!wt) {
+      wt = await prisma.workType.create({ data: { departmentId, name, isActive: true } });
+    }
+    return wt;
+  }
+
+  const deptInspeccion    = await upsertDepartment("Inspección de Cargas");
+  const deptMantenimiento = await upsertDepartment("Mantenimiento y Obras");
+  const deptAduana        = await upsertDepartment("Control Aduanero");
+
+  console.log(`✓ Departments: ${deptInspeccion.name}, ${deptMantenimiento.name}, ${deptAduana.name}`);
+
+  const wtInspeccionCarga  = await upsertWorkType(deptInspeccion.id,    "Inspección de carga general");
+  const wtInspeccionGrano  = await upsertWorkType(deptInspeccion.id,    "Inspección de granos y cereales");
+  const wtInspeccionQuim   = await upsertWorkType(deptInspeccion.id,    "Inspección de productos químicos");
+  const wtMantenimientoPre = await upsertWorkType(deptMantenimiento.id, "Mantenimiento preventivo");
+  const wtMantenimientoCor = await upsertWorkType(deptMantenimiento.id, "Reparación correctiva");
+  const wtObrasCiviles     = await upsertWorkType(deptMantenimiento.id, "Obras civiles portuarias");
+  const wtAduanaDoc        = await upsertWorkType(deptAduana.id,        "Control documental");
+  const wtAduanaFisico     = await upsertWorkType(deptAduana.id,        "Control físico de mercadería");
+
+  // Suppress unused warnings — all work types are valid seed data even if not used in sample allocation
+  void wtInspeccionGrano; void wtInspeccionQuim;
+  void wtMantenimientoPre; void wtMantenimientoCor; void wtObrasCiviles;
+  void wtAduanaDoc; void wtAduanaFisico;
+
+  console.log(`✓ WorkTypes: 8 created across 3 departments`);
+
+  // =========================================================================
+  // 4. Provider User
+  // =========================================================================
+
+  const provider = await upsertUser({
+    companyId: providerCompany.id,
+    branchId: branch.id,
+    email: "proveedor@lanchas-rosario.dev",
+    password: "proveedor123",
+    firstName: "Roberto",
+    lastName: "Lanceros",
+    role: "PROVIDER",
   });
-  if (!boat) {
-    boat = await prisma.boat.create({
+  console.log(`✓ Provider: ${provider.email} / proveedor123`);
+
+  // =========================================================================
+  // 5. UABL Staff Users (one per department)
+  // =========================================================================
+
+  const uablInspeccion = await upsertUser({
+    companyId: uablCompany.id,
+    departmentId: deptInspeccion.id,
+    email: "inspeccion@uabl.dev",
+    password: "uabl123",
+    firstName: "Marcela",
+    lastName: "Torres",
+    role: "UABL_STAFF",
+  });
+
+  const uablMantenimiento = await upsertUser({
+    companyId: uablCompany.id,
+    departmentId: deptMantenimiento.id,
+    email: "mantenimiento@uabl.dev",
+    password: "uabl123",
+    firstName: "Gustavo",
+    lastName: "Pereyra",
+    role: "UABL_STAFF",
+  });
+
+  const uablAduana = await upsertUser({
+    companyId: uablCompany.id,
+    departmentId: deptAduana.id,
+    email: "aduana@uabl.dev",
+    password: "uabl123",
+    firstName: "Patricia",
+    lastName: "Ríos",
+    role: "UABL_STAFF",
+  });
+
+  void uablMantenimiento; void uablAduana;
+  console.log(`✓ UABL Staff: ${uablInspeccion.email} (+ 2 more) / uabl123`);
+
+  // =========================================================================
+  // 6. Company Representatives
+  // =========================================================================
+
+  const repAlfa = await upsertUser({
+    companyId: empresaAlfa.id,
+    email: "representante@empresa-alfa.dev",
+    password: "empresa123",
+    firstName: "Lucas",
+    lastName: "Martínez",
+    role: "COMPANY_REP",
+  });
+
+  const repBeta = await upsertUser({
+    companyId: empresaBeta.id,
+    email: "representante@empresa-beta.dev",
+    password: "empresa123",
+    firstName: "Valeria",
+    lastName: "González",
+    role: "COMPANY_REP",
+  });
+
+  void repBeta;
+  console.log(`✓ Company Reps: ${repAlfa.email}, ${repBeta.email} / empresa123`);
+
+  // =========================================================================
+  // 7. Employee Users
+  // =========================================================================
+
+  const employeeDefs = [
+    { company: empresaAlfa, email: "juan.perez@empresa-alfa.dev",     firstName: "Juan",   lastName: "Pérez" },
+    { company: empresaAlfa, email: "maria.garcia@empresa-alfa.dev",   firstName: "María",  lastName: "García" },
+    { company: empresaAlfa, email: "diego.lopez@empresa-alfa.dev",    firstName: "Diego",  lastName: "López" },
+    { company: empresaBeta, email: "ana.fernandez@empresa-beta.dev",  firstName: "Ana",    lastName: "Fernández" },
+    { company: empresaBeta, email: "carlos.ruiz@empresa-beta.dev",    firstName: "Carlos", lastName: "Ruiz" },
+  ] as const;
+
+  const createdEmployees = [];
+  for (const emp of employeeDefs) {
+    const user = await upsertUser({
+      companyId: emp.company.id,
+      email: emp.email,
+      password: "empleado123",
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      role: "EMPLOYEE",
+    });
+    createdEmployees.push(user);
+  }
+  console.log(`✓ Employees: ${createdEmployees.length} created / empleado123`);
+
+  // =========================================================================
+  // 8. Fleet (Boats + Driver under Provider)
+  // =========================================================================
+
+  let barcoAlfa = await prisma.boat.findFirst({
+    where: { companyId: providerCompany.id, name: "Lancha Rosario I" },
+  });
+  if (!barcoAlfa) {
+    barcoAlfa = await prisma.boat.create({
       data: {
-        companyId: company.id,
+        companyId: providerCompany.id,
         branchId: branch.id,
-        name: "Barco Alpha",
-        capacity: 2,
-        description: "Embarcação de teste — capacidade intencional de 2 lugares.",
+        name: "Lancha Rosario I",
+        capacity: 20,
+        description: "Embarcación principal — 20 lugares",
         isActive: true,
       },
     });
   }
-  console.log(`✓ Boat      : ${boat.name} (capacity: ${boat.capacity})`);
 
-  // ── 4. Driver ───────────────────────────────────────────────────────────
+  let barcoBeta = await prisma.boat.findFirst({
+    where: { companyId: providerCompany.id, name: "Lancha Rosario II" },
+  });
+  if (!barcoBeta) {
+    barcoBeta = await prisma.boat.create({
+      data: {
+        companyId: providerCompany.id,
+        branchId: branch.id,
+        name: "Lancha Rosario II",
+        capacity: 20,
+        description: "Embarcación secundaria — 20 lugares",
+        isActive: true,
+      },
+    });
+  }
+
+  console.log(`✓ Boats: ${barcoAlfa.name}, ${barcoBeta.name} (capacity: 20 each)`);
+
   let driver = await prisma.driver.findFirst({
-    where: { companyId: company.id, branchId: branch.id, firstName: "Rui", lastName: "Santos" },
+    where: { companyId: providerCompany.id, firstName: "Héctor", lastName: "Cano" },
   });
   if (!driver) {
     driver = await prisma.driver.create({
       data: {
-        companyId: company.id,
+        companyId: providerCompany.id,
         branchId: branch.id,
-        firstName: "Rui",
-        lastName: "Santos",
-        licenseNumber: "NAV-DEV-001",
-        phone: "+351 900 000 001",
+        firstName: "Héctor",
+        lastName: "Cano",
+        licenseNumber: "NAV-ROS-001",
+        phone: "+54 341 500 0001",
         isActive: true,
       },
     });
   }
-  console.log(`✓ Driver    : ${driver.firstName} ${driver.lastName}`);
+  console.log(`✓ Driver: ${driver.firstName} ${driver.lastName}`);
 
-  // ── 5. Users ─────────────────────────────────────────────────────────────
-  // bcrypt cost 10 is fine for dev (faster than the production 12).
-  const ROUNDS = 10;
-
-  // PASSENGER — no branchId (passengers are company-scoped only).
-  const passengerHash = await bcrypt.hash(USERS.passenger.password, ROUNDS);
-  const passenger = await prisma.user.upsert({
-    where: {
-      companyId_email: { companyId: company.id, email: USERS.passenger.email },
-    },
-    update: {},
-    create: {
-      companyId: company.id,
-      email: USERS.passenger.email,
-      passwordHash: passengerHash,
-      firstName: USERS.passenger.firstName,
-      lastName: USERS.passenger.lastName,
-      role: USERS.passenger.role,
-      isActive: true,
-    },
-  });
-  console.log(`✓ Passenger : ${passenger.email} / ${USERS.passenger.password}`);
-
-  // OPERATOR — must have branchId so the operator trips page shows data.
-  const operatorHash = await bcrypt.hash(USERS.operator.password, ROUNDS);
-  const operator = await prisma.user.upsert({
-    where: {
-      companyId_email: { companyId: company.id, email: USERS.operator.email },
-    },
-    update: {},
-    create: {
-      companyId: company.id,
-      branchId: branch.id,
-      email: USERS.operator.email,
-      passwordHash: operatorHash,
-      firstName: USERS.operator.firstName,
-      lastName: USERS.operator.lastName,
-      role: USERS.operator.role,
-      isActive: true,
-    },
-  });
-  console.log(`✓ Operator  : ${operator.email} / ${USERS.operator.password}`);
-
-  // ADMIN — branch-scoped so /admin/trips renders (same guard as operator page).
-  const adminHash = await bcrypt.hash(USERS.admin.password, ROUNDS);
-  const admin = await prisma.user.upsert({
-    where: {
-      companyId_email: { companyId: company.id, email: USERS.admin.email },
-    },
-    update: {},
-    create: {
-      companyId: company.id,
-      branchId: branch.id,
-      email: USERS.admin.email,
-      passwordHash: adminHash,
-      firstName: USERS.admin.firstName,
-      lastName: USERS.admin.lastName,
-      role: USERS.admin.role,
-      isActive: true,
-    },
-  });
-  console.log(`✓ Admin     : ${admin.email} / ${USERS.admin.password}`);
-
-  // ── 6. Trips ─────────────────────────────────────────────────────────────
-  // capacity is snapshotted from boat (design principle — see schema comments).
-  // We set it directly here as the seed bypasses the service layer.
-  // 3 trips on different days/times so tests can target specific ones.
+  // =========================================================================
+  // 9. Trips
+  // =========================================================================
 
   const tripDefs = [
     {
-      label: "Trip A (tomorrow 08:00)",
-      departureTime: futureDate(1, 8, 0),
-      estimatedArrivalTime: futureDate(1, 9, 0),
-      notes: "Seed trip A — use for basic booking test",
+      label: "Viaje A (mañana 07:00) — Lancha I",
+      boat: barcoAlfa,
+      departureTime: futureDate(1, 7, 0),
+      estimatedArrivalTime: futureDate(1, 7, 30),
+      notes: "Viaje matutino — turno 1",
     },
     {
-      label: "Trip B (tomorrow 14:00)",
-      departureTime: futureDate(1, 14, 0),
-      estimatedArrivalTime: futureDate(1, 15, 0),
-      notes: "Seed trip B — use for waitlist test",
+      label: "Viaje B (mañana 13:00) — Lancha I",
+      boat: barcoAlfa,
+      departureTime: futureDate(1, 13, 0),
+      estimatedArrivalTime: futureDate(1, 13, 30),
+      notes: "Viaje mediodía — turno 2",
     },
     {
-      label: "Trip C (day after tomorrow 10:00)",
-      departureTime: futureDate(2, 10, 0),
-      estimatedArrivalTime: futureDate(2, 11, 0),
-      notes: "Seed trip C — use for cancellation + promotion test",
+      label: "Viaje C (pasado mañana 07:00) — Lancha II",
+      boat: barcoBeta,
+      departureTime: futureDate(2, 7, 0),
+      estimatedArrivalTime: futureDate(2, 7, 30),
+      notes: "Segundo día — Lancha II",
     },
   ];
 
   const trips = [];
   for (const def of tripDefs) {
-    // Idempotency: find by exact departure time within this company+branch.
     let trip = await prisma.trip.findFirst({
       where: {
-        companyId: company.id,
+        companyId: providerCompany.id,
         branchId: branch.id,
         departureTime: def.departureTime,
       },
@@ -251,45 +364,104 @@ async function main() {
     if (!trip) {
       trip = await prisma.trip.create({
         data: {
-          companyId: company.id,
+          companyId: providerCompany.id,
           branchId: branch.id,
-          boatId: boat.id,
+          boatId: def.boat.id,
           driverId: driver.id,
           departureTime: def.departureTime,
           estimatedArrivalTime: def.estimatedArrivalTime,
           status: "SCHEDULED",
-          capacity: boat.capacity, // snapshot
+          capacity: def.boat.capacity,
           waitlistEnabled: true,
           notes: def.notes,
         },
       });
     }
     trips.push(trip);
-    console.log(`✓ Trip      : ${def.label} (id: ${trip.id})`);
+    console.log(`✓ Trip: ${def.label}`);
   }
 
-  // ── Summary ──────────────────────────────────────────────────────────────
+  // =========================================================================
+  // 10. Sample TripAllocation — Empresa Alfa, Viaje A, 2 seats PENDING
+  // =========================================================================
+
+  const tripA = trips[0]!;
+  const existingAlloc = await prisma.tripAllocation.findFirst({
+    where: { companyId: empresaAlfa.id, tripId: tripA.id },
+  });
+
+  if (!existingAlloc) {
+    const allocation = await prisma.tripAllocation.create({
+      data: {
+        companyId: empresaAlfa.id,
+        tripId: tripA.id,
+        requestedById: repAlfa.id,
+        status: "SUBMITTED",
+        submittedAt: new Date(),
+      },
+    });
+
+    await prisma.seatRequest.create({
+      data: {
+        allocationId: allocation.id,
+        employeeId: createdEmployees[0]!.id, // Juan Pérez
+        workTypeId: wtInspeccionCarga.id,
+        departmentId: deptInspeccion.id,
+        status: "PENDING",
+      },
+    });
+
+    await prisma.seatRequest.create({
+      data: {
+        allocationId: allocation.id,
+        employeeId: createdEmployees[1]!.id, // María García
+        workTypeId: wtInspeccionCarga.id,
+        departmentId: deptInspeccion.id,
+        status: "PENDING",
+      },
+    });
+
+    console.log(`✓ Sample Allocation: Empresa Alfa → Viaje A (2 seats PENDING — ready for UABL)`);
+  } else {
+    console.log(`✓ Sample Allocation: already exists (skipped)`);
+  }
+
+  // =========================================================================
+  // Summary
+  // =========================================================================
+
   console.log(`
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- SEED COMPLETE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ SEED COMPLETE — HarborFlow V2
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
- Company slug : harbor-norte
- Branch       : ${branch.id}
+ PROVEEDOR  →  /provider   (slug: lanchas-rosario)
+   proveedor@lanchas-rosario.dev  /  proveedor123
 
- PASSENGER    : passenger@harbor-norte.dev  /  passenger123
- OPERATOR     : operator@harbor-norte.dev   /  operator123
- ADMIN        : admin@harbor-norte.dev      /  admin123
+ UABL STAFF  →  /uabl      (slug: uabl)
+   inspeccion@uabl.dev      /  uabl123  (Inspección de Cargas)
+   mantenimiento@uabl.dev   /  uabl123  (Mantenimiento y Obras)
+   aduana@uabl.dev          /  uabl123  (Control Aduanero)
 
- Trips (all with capacity 2, waitlist enabled):
-${trips.map((t, i) => `   [${i + 1}] id: ${t.id}`).join("\n")}
+ COMPANY REPS  →  /company
+   representante@empresa-alfa.dev  /  empresa123  (slug: empresa-alfa)
+   representante@empresa-beta.dev  /  empresa123  (slug: empresa-beta)
 
- Use TRIP B or C to test the waitlist:
-   — Book with PASSENGER  → CONFIRMED (seat 1)
-   — Book with a 2nd user → CONFIRMED (seat 2)
-   — 3rd booking          → WAITLISTED
+ EMPLOYEES  →  /employee
+   juan.perez@empresa-alfa.dev    /  empleado123
+   maria.garcia@empresa-alfa.dev  /  empleado123
+   diego.lopez@empresa-alfa.dev   /  empleado123
+   ana.fernandez@empresa-beta.dev /  empleado123
+   carlos.ruiz@empresa-beta.dev   /  empleado123
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ HAPPY PATH DE PRUEBA:
+   1. inspeccion@uabl.dev → /uabl → ver "Viaje A mañana 07:00"
+      → 2 asientos en azul (PENDING) de Empresa Alfa
+      → Confirmar asientos de Juan Pérez y María García
+   2. juan.perez@empresa-alfa.dev → /employee → ver viaje confirmado
+   3. representante@empresa-alfa.dev → /company → ver estado SUBMITTED
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `);
 }
 

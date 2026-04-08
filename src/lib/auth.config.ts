@@ -24,6 +24,9 @@ export const authConfig = {
       if (user) {
         token.companyId = user.companyId;
         token.branchId = user.branchId ?? null;
+        // departmentId: present only for UABL_STAFF users.
+        // Scopes their confirmation authority to their department's work types.
+        token.departmentId = user.departmentId ?? null;
         token.firstName = user.firstName;
         token.lastName = user.lastName;
         token.role = user.role;
@@ -37,6 +40,7 @@ export const authConfig = {
       session.user.id = token.sub!;
       session.user.companyId = token.companyId as string;
       session.user.branchId = token.branchId as string | null;
+      session.user.departmentId = token.departmentId as string | null;
       session.user.firstName = token.firstName as string;
       session.user.lastName = token.lastName as string;
       session.user.role = token.role as UserRole;

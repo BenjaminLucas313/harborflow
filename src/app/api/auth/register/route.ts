@@ -1,9 +1,10 @@
-// POST /api/auth/register — public passenger self-registration.
-// Delegates to modules/auth/service.registerPassenger; maps AppError codes to HTTP responses.
+// POST /api/auth/register — public employee self-registration (V2).
+// Creates an EMPLOYEE account within the specified company.
+// COMPANY_REP, UABL_STAFF, and PROVIDER accounts are created by administrators only.
 import { NextRequest, NextResponse } from "next/server";
 
 import { RegisterSchema } from "@/modules/auth/schema";
-import { registerPassenger } from "@/modules/auth/service";
+import { registerEmployee } from "@/modules/auth/service";
 import { AppError } from "@/lib/errors";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await registerPassenger(parsed.data);
+    await registerEmployee(parsed.data);
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (err) {
     if (err instanceof AppError) {

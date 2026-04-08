@@ -1,10 +1,10 @@
-// POST /api/reservations — book a trip (PASSENGER only)
-//   Body: { tripId: string }
-//   companyId and userId are always taken from the session — never the body.
+// POST /api/reservations — legacy V1 booking endpoint.
 //
-// GET /api/reservations — list reservations (authenticated)
-//   PASSENGER : own active reservations (no query params needed)
-//   OPERATOR / ADMIN : ?tripId=<id>  — manifest for a specific trip
+// NOTE: This endpoint is retained for historical data compatibility.
+// New bookings in V2 use the allocation flow:
+//   POST /api/allocations → POST /api/allocations/[id]/seats → POST /api/allocations/[id]/submit
+//
+// GET /api/reservations — legacy V1 reservation listing.
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -17,14 +17,11 @@ import {
   listReservationsByTrip,
 } from "@/modules/reservations/service";
 
-// ---------------------------------------------------------------------------
-// POST — create a reservation
-// ---------------------------------------------------------------------------
-
 const CreateReservationBodySchema = z.object({
   tripId: z.string().min(1),
 });
 
+/** @deprecated V1 only. New bookings use /api/allocations. */
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const session = await auth();
 
@@ -35,9 +32,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  if (session.user.role !== "PASSENGER") {
+  // In V2, EMPLOYEE is the equivalent of the old PASSENGER role.
+  if (session.user.role !== "EMPLOYEE") {
     return NextResponse.json(
-      { code: "FORBIDDEN", message: "Only passengers can create reservations." },
+      { code: "FORBIDDEN", message: "Only employees can create legacy reservations." },
       { status: 403 },
     );
   }
@@ -67,8 +65,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       companyId: session.user.companyId,
     });
 
-    // Return the booking outcome with a discriminated type field so the client
-    // can branch on "CONFIRMED" vs "WAITLISTED" without inspecting status strings.
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     if (err instanceof AppError) {
@@ -84,10 +80,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// GET — list reservations
-// ---------------------------------------------------------------------------
-
+/** @deprecated V1 only. */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const session = await auth();
 
@@ -101,13 +94,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const { role, id: userId, companyId } = session.user;
 
   try {
-    if (role === "PASSENGER") {
-      // Passengers see only their own active reservations.
+    if (role === "EMPLOYEE") {
       const reservations = await listReservationsByUser(userId, companyId);
       return NextResponse.json({ reservations });
     }
 
-    // Operators and admins query by tripId.
     const tripId = req.nextUrl.searchParams.get("tripId");
     if (!tripId) {
       return NextResponse.json(
