@@ -43,15 +43,26 @@ export default auth((req) => {
   const { role } = session.user;
   const dashboard = dashboardForRole(role);
 
-  // Already on the login page → send to own dashboard.
-  if (pathname === LOGIN_PATH) {
+  // Legacy V1 roles (PASSENGER, OPERATOR, ADMIN) have no V2 dashboard — their
+  // ROLE_DASHBOARD entry is "/", which would cause every redirect to loop back
+  // to the landing page. Treat them as needing re-authentication: let public
+  // routes through, push everything else to /login.
+  if (dashboard === "/") {
+    if (isPublic) return NextResponse.next();
+    const loginUrl = req.nextUrl.clone();
+    loginUrl.pathname = LOGIN_PATH;
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Already on login or register → send to own dashboard (already signed in).
+  if (pathname === LOGIN_PATH || pathname === "/register") {
     const dest = req.nextUrl.clone();
     dest.pathname = dashboard;
     dest.search = "";
     return NextResponse.redirect(dest);
   }
 
-  // Public landing page → let through (passengers may browse while logged in).
+  // Public landing page → let through.
   if (pathname === "/") return NextResponse.next();
 
   // Protected route that doesn't belong to this role → redirect to own dashboard.
