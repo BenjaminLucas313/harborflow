@@ -10,11 +10,23 @@ export const PUBLIC_ROUTES: string[] = ["/", "/login", "/register"];
 /** The fallback path when an unauthenticated user hits a protected route. */
 export const LOGIN_PATH = "/login";
 
-/** Root path for each role's dashboard. */
+/**
+ * Root path for each role's dashboard.
+ *
+ * V2 roles: USUARIO, EMPRESA, UABL, PROVEEDOR
+ * V1 legacy roles (PASSENGER, OPERATOR, ADMIN) map to "/" as a safe fallback
+ * until their accounts are migrated. They will be redirected to login from there.
+ */
 export const ROLE_DASHBOARD: Record<UserRole, string> = {
-  PASSENGER: "/passenger",
-  OPERATOR: "/operator",
-  ADMIN: "/admin",
+  // V2 roles
+  USUARIO:   "/usuario",
+  EMPRESA:   "/empresa",
+  UABL:      "/uabl",
+  PROVEEDOR: "/proveedor",
+  // V1 legacy — safe fallback, these accounts should be remapped
+  PASSENGER: "/",
+  OPERATOR:  "/",
+  ADMIN:     "/",
 };
 
 /**
@@ -30,22 +42,22 @@ export function dashboardForRole(role: UserRole): string {
  * Used in middleware to decide whether to redirect a user who is authenticated
  * but accessing the wrong role's section.
  *
- * ADMINs have company-wide access and may visit any protected section
- * (operator manifest, passenger overview, etc.). Individual layouts impose
- * their own finer-grained checks for sections that restrict ADMIN entry.
+ * UABL users have broader access: they can access their own /uabl/* section
+ * including the /uabl/admin/* sub-section (isUablAdmin is checked at layout level).
  *
  * Examples:
- *   isAllowedPath("ADMIN",     "/admin/users")    → true
- *   isAllowedPath("ADMIN",     "/operator/trips") → true  (admin has full access)
- *   isAllowedPath("OPERATOR",  "/operator/trips") → true
- *   isAllowedPath("OPERATOR",  "/admin/users")    → false
- *   isAllowedPath("PASSENGER", "/operator")       → false
+ *   isAllowedPath("UABL",      "/uabl/metricas")   → true
+ *   isAllowedPath("UABL",      "/uabl/admin")       → true  (layout checks isUablAdmin)
+ *   isAllowedPath("EMPRESA",   "/empresa/reservas") → true
+ *   isAllowedPath("EMPRESA",   "/uabl")             → false
+ *   isAllowedPath("USUARIO",   "/empresa")          → false
  */
 export function isAllowedPath(role: UserRole, pathname: string): boolean {
-  // Admins have company-wide access — never blocked by role-path checks.
-  if (role === "ADMIN") return true;
-
   const dashboard = ROLE_DASHBOARD[role];
+
+  // Legacy roles without a real dashboard — they have no allowed paths.
+  if (dashboard === "/") return false;
+
   // Root dashboard exact match OR any sub-path.
   return pathname === dashboard || pathname.startsWith(dashboard + "/");
 }

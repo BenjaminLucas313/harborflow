@@ -1,6 +1,6 @@
 // Auth service: public registration flow.
 // Resolves companySlug → companyId, then delegates to users/service.
-// Role is always PASSENGER for self-registration; admin-created users go through users/service directly.
+// Role is always USUARIO for self-registration (V2); admin-created users go through users/service directly.
 
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
@@ -9,11 +9,11 @@ import type { SafeUser } from "@/modules/users/repository";
 import type { RegisterInput } from "./schema";
 
 /**
- * Public passenger self-registration.
+ * Public self-registration. Creates a USUARIO account.
  *
  * Steps:
  *   1. Resolve companySlug → company (must exist and be active).
- *   2. Delegate to users/service.createUser with role locked to PASSENGER.
+ *   2. Delegate to users/service.createUser with role locked to USUARIO.
  *
  * Throws:
  *   COMPANY_NOT_FOUND (404)       — slug unknown or company inactive
@@ -34,12 +34,13 @@ export async function registerPassenger(input: RegisterInput): Promise<SafeUser>
   }
 
   return createUser({
-    companyId: company.id,
-    email: input.email,
-    password: input.password,
-    firstName: input.firstName,
-    lastName: input.lastName,
-    phone: input.phone,
-    role: "PASSENGER",
+    companyId:   company.id,
+    email:       input.email,
+    password:    input.password,
+    firstName:   input.firstName,
+    lastName:    input.lastName,
+    phone:       input.phone,
+    role:        "USUARIO",
+    isUablAdmin: false,
   });
 }

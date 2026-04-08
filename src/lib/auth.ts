@@ -5,7 +5,7 @@
 // The Prisma adapter is intentionally NOT used because:
 //   1. Our email is unique per-company, not globally — the adapter assumes global uniqueness.
 //   2. JWT sessions require no Session table writes.
-//   3. No OAuth or email verification in V1, so Account/VerificationToken tables are unnecessary.
+//   3. No OAuth or email verification in V1/V2, so Account/VerificationToken tables are unnecessary.
 //
 // Requires AUTH_SECRET in .env (generate: openssl rand -base64 32).
 //
@@ -23,7 +23,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
     Credentials({
-      // Field definitions used by the built-in sign-in page (not our custom UI).
       credentials: {
         email: {},
         password: {},
@@ -57,6 +56,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             passwordHash: true,
             role: true,
             isActive: true,
+            // V2 additions
+            departmentId: true,
+            employerId: true,
+            isUablAdmin: true,
           },
         });
         if (!user?.isActive) return null;
@@ -75,6 +78,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
+          departmentId: user.departmentId,
+          employerId: user.employerId,
+          isUablAdmin: user.isUablAdmin,
         };
       },
     }),

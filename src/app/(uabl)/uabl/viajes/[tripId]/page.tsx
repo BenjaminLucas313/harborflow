@@ -1,0 +1,90 @@
+import { redirect, notFound } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { listSlotsByTrip } from "@/modules/passenger-slots/service";
+import { SlotReviewCard } from "@/components/uabl/slot-review-card";
+
+export default async function TripDetail({
+  params,
+}: {
+  params: Promise<{ tripId: string }>;
+}) {
+  const session = await auth();
+  if (!session) redirect("/login");
+
+  const { tripId } = await params;
+  const { companyId, departmentId } = session.user;
+
+  const trip = await prisma.trip.findUnique({
+    where:  { id: tripId, companyId },
+    select: {
+      id:            true,
+      departureTime: true,
+      capacity:      true,
+      boat:          { select: { name: true } },
+      branch:        { select: { name: true } },
+    },
+  });
+  if (!trip) notFound();
+
+  // Fetch all slots for the trip, filtered by dept if assigned.
+  const allSlots = await listSlotsByTrip(companyId, tripId);
+  const slots = departmentId
+    ? allSlots.filter((s) => s.departmentId === departmentId)
+    : allSlots;
+
+  const pending   = slots.filter((s) => s.status === "PENDING").length;
+  const confirmed = slots.filter((s) => s.status === "CONFIRMED").length;
+  const rejected  = slots.filter((s) => s.status === "REJECTED").length;
+
+  const departure = new Date(trip.departureTime).toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday:  "long",
+    day:      "numeric",
+    month:    "long",
+    year:     "numeric",
+    hour:     "2-digit",
+    minute:   "2-digit",
+  });
+
+  return (
+    <main className="mx-auto max-w-4xl px-4 py-10 space-y-6">
+      {/* Trip header */}
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">{trip.boat.name}</h1>
+        <p className="text-sm text-muted-foreground">{departure} · {trip.branch.name}</p>
+      </div>
+
+      {/* Summary row */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl border bg-blue-50 border-blue-200 p-4 text-center">
+          <p className="text-2xl font-bold text-blue-700">{pending}</p>
+          <p className="text-xs text-blue-600 mt-0.5">Pendiente{pending !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="rounded-xl border bg-emerald-50 border-emerald-200 p-4 text-center">
+          <p className="text-2xl font-bold text-emerald-700">{confirmed}</p>
+          <p className="text-xs text-emerald-600 mt-0.5">Confirmado{confirmed !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="rounded-xl border bg-red-50 border-red-200 p-4 text-center">
+          <p className="text-2xl font-bold text-red-700">{rejected}</p>
+          <p className="text-xs text-red-600 mt-0.5">Rechazado{rejected !== 1 ? "s" : ""}</p>
+        </div>
+      </div>
+
+      {/* Slot list */}
+      {slots.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">
+          No hay slots asignados a tu departamento para este viaje.
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {slots.map((slot) => (
+            <li key={slot.id}>
+              <SlotReviewCard slot={slot} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </main>
+  );
+}

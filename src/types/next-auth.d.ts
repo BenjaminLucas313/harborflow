@@ -14,6 +14,13 @@ declare module "next-auth" {
       firstName: string;
       lastName: string;
       role: UserRole;
+      // V2 additions
+      /** For UABL users: the department this user can review slots for. */
+      departmentId: string | null;
+      /** For EMPRESA users: the employer entity they book on behalf of. */
+      employerId: string | null;
+      /** For UABL users: if true, can manage departments and work types. */
+      isUablAdmin: boolean;
     } & DefaultSession["user"];
   }
 
@@ -24,6 +31,10 @@ declare module "next-auth" {
     firstName: string;
     lastName: string;
     role: UserRole;
+    // V2 additions
+    departmentId: string | null;
+    employerId: string | null;
+    isUablAdmin: boolean;
   }
 }
 
@@ -35,5 +46,9 @@ declare module "next-auth/jwt" {
     firstName: string;
     lastName: string;
     role: UserRole;
+    // V2 additions
+    departmentId: string | null;
+    employerId: string | null;
+    isUablAdmin: boolean;
   }
 }

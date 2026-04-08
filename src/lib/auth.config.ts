@@ -22,11 +22,15 @@ export const authConfig = {
     // `user` is only present on the first call (right after authorize returns).
     jwt({ token, user }) {
       if (user) {
-        token.companyId = user.companyId;
-        token.branchId = user.branchId ?? null;
-        token.firstName = user.firstName;
-        token.lastName = user.lastName;
-        token.role = user.role;
+        token.companyId    = user.companyId;
+        token.branchId     = user.branchId ?? null;
+        token.firstName    = user.firstName;
+        token.lastName     = user.lastName;
+        token.role         = user.role;
+        // V2 additions
+        token.departmentId = user.departmentId ?? null;
+        token.employerId   = user.employerId ?? null;
+        token.isUablAdmin  = user.isUablAdmin ?? false;
       }
       return token;
     },
@@ -34,12 +38,16 @@ export const authConfig = {
     // Project token claims into the session object available to the app.
     // token.sub is the user.id set automatically by Auth.js.
     session({ session, token }) {
-      session.user.id = token.sub!;
-      session.user.companyId = token.companyId as string;
-      session.user.branchId = token.branchId as string | null;
-      session.user.firstName = token.firstName as string;
-      session.user.lastName = token.lastName as string;
-      session.user.role = token.role as UserRole;
+      session.user.id           = token.sub!;
+      session.user.companyId    = token.companyId as string;
+      session.user.branchId     = token.branchId as string | null;
+      session.user.firstName    = token.firstName as string;
+      session.user.lastName     = token.lastName as string;
+      session.user.role         = token.role as UserRole;
+      // V2 additions
+      session.user.departmentId = token.departmentId as string | null;
+      session.user.employerId   = token.employerId as string | null;
+      session.user.isUablAdmin  = token.isUablAdmin as boolean;
       return session;
     },
   },

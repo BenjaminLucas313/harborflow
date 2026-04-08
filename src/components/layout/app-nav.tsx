@@ -10,20 +10,35 @@ import { LogoutButton } from "@/components/auth/logout-button";
 // ---------------------------------------------------------------------------
 
 const ROLE_BADGE: Record<string, { label: string; classes: string }> = {
+  // V2 roles
+  USUARIO: {
+    label: "Usuario",
+    classes: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+  },
+  EMPRESA: {
+    label: "Empresa",
+    classes: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  },
+  UABL: {
+    label: "UABL",
+    classes: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+  },
+  PROVEEDOR: {
+    label: "Proveedor",
+    classes: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  },
+  // V1 legacy (kept for backwards compat)
   PASSENGER: {
     label: "Passenger",
-    classes:
-      "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+    classes: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
   },
   OPERATOR: {
     label: "Operator",
-    classes:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    classes: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   },
   ADMIN: {
     label: "Admin",
-    classes:
-      "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+    classes: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
   },
 };
 

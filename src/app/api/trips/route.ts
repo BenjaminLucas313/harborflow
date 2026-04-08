@@ -94,9 +94,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  if (session.user.role !== "ADMIN") {
+  if (session.user.role !== "ADMIN" && session.user.role !== "PROVEEDOR") {
     return NextResponse.json(
-      { code: "FORBIDDEN", message: "Only administrators can create trips." },
+      { code: "FORBIDDEN", message: "Only PROVEEDOR or administrators can create trips." },
       { status: 403 },
     );
   }
