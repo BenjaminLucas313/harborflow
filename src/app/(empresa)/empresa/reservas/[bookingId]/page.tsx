@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { CheckCircle2, Clock, XCircle, Plus } from "lucide-react";
 import { SubmitBookingButton } from "@/components/empresa/submit-booking-button";
 import { AddSlotPanel } from "@/components/empresa/add-slot-panel";
+import { SeatGrid } from "@/components/trips/seat-grid";
 
 type SlotCfg = { label: string; icon: typeof Clock; color: string };
 const SLOT_STATUS_DEFAULT: SlotCfg = { label: "Pendiente", icon: Clock, color: "text-blue-700" };
@@ -39,10 +40,10 @@ export default async function BookingDetail({
     },
   });
 
-  const occupied = booking.passengerSlots.filter(
-    (s) => s.status === "PENDING" || s.status === "CONFIRMED",
-  ).length;
-  const available = (trip?.capacity ?? 0) - occupied;
+  const pendingSlots   = booking.passengerSlots.filter((s) => s.status === "PENDING").length;
+  const confirmedSlots = booking.passengerSlots.filter((s) => s.status === "CONFIRMED").length;
+  const occupied       = pendingSlots + confirmedSlots;
+  const available      = (trip?.capacity ?? 0) - occupied;
 
   const departure = trip
     ? new Date(trip.departureTime).toLocaleString("es-AR", {
@@ -68,6 +69,13 @@ export default async function BookingDetail({
           {available} lugar{available !== 1 ? "es" : ""} disponible{available !== 1 ? "s" : ""} · {occupied}/{trip?.capacity ?? "—"} ocupados
         </p>
       </div>
+
+      {/* Seat occupancy grid — additive visual reference */}
+      {trip && (
+        <div className="rounded-xl border border-border bg-muted/40 px-5 py-4">
+          <SeatGrid capacity={trip.capacity} confirmed={confirmedSlots} pending={pendingSlots} />
+        </div>
+      )}
 
       {/* Status + actions */}
       <div className="flex flex-wrap gap-3 items-center">

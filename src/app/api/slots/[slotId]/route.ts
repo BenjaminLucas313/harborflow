@@ -14,7 +14,12 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json(
+        { code: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 },
+      );
+    }
 
     assertRole(session.user.role, ["UABL", "EMPRESA"]);
 
@@ -23,9 +28,15 @@ export async function GET(
     return NextResponse.json(slot);
   } catch (err) {
     if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
+      return NextResponse.json(
+        { code: err.code, message: err.message },
+        { status: err.statusCode },
+      );
     }
-    return NextResponse.json({ error: "Error interno." }, { status: 500 });
+    return NextResponse.json(
+      { code: "INTERNAL_ERROR", message: "Error interno." },
+      { status: 500 },
+    );
   }
 }
 
@@ -35,7 +46,12 @@ export async function PATCH(
 ): Promise<NextResponse> {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json(
+        { code: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 },
+      );
+    }
 
     assertRole(session.user.role, ["UABL"]);
 
@@ -43,7 +59,7 @@ export async function PATCH(
     const parsed = ReviewSlotSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Datos inválidos.", details: parsed.error.flatten() },
+        { code: "VALIDATION_ERROR", message: "Datos inválidos." },
         { status: 400 },
       );
     }
@@ -58,9 +74,15 @@ export async function PATCH(
     return NextResponse.json(slot);
   } catch (err) {
     if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
+      return NextResponse.json(
+        { code: err.code, message: err.message },
+        { status: err.statusCode },
+      );
     }
     console.error("[PATCH /api/slots/[slotId]]", err);
-    return NextResponse.json({ error: "Error interno." }, { status: 500 });
+    return NextResponse.json(
+      { code: "INTERNAL_ERROR", message: "Error interno." },
+      { status: 500 },
+    );
   }
 }

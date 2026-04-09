@@ -318,3 +318,22 @@ A task is not done unless:
 - obvious edge cases are covered
 - code is readable and maintainable
 - the UI communicates state clearly
+
+## Available Skills
+
+Skills are located in `.claude/skills/`. Claude should consult the relevant skill before working on any task in that domain.
+
+- `api-design-guard` — API route structure, error codes, response shape
+- `auth-and-rbac` — Auth.js v5, session handling, role redirects, RBAC rules
+- `prisma-patterns` — Query patterns, transactions, migrations, error mapping
+- `error-handling` — Error classification, server/client error propagation
+- `form-validation` — Zod schemas, inline errors, client+server validation
+- `ui-ux-guard` — Accessibility, mobile-first, operational clarity
+- `ui-animations-pro` — Motion guidelines, feedback animations
+- `db-guardian` — (ya existente)
+- `admin-metrics` — (ya existente)
+- `feature-spec` — (ya existente)
+- `git-workflow` — (ya existente)
+- `port-operations` — (ya existente)
+- `project-overview` — (ya existente)
+- `reservation-engine` — (ya existente)

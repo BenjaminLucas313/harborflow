@@ -20,7 +20,7 @@ export function SubmitBookingButton({ bookingId }: { bookingId: string }) {
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Error al enviar.");
+      setError(body.message ?? body.error ?? "Error al enviar.");
       return;
     }
     router.refresh();

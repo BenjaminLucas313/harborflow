@@ -52,7 +52,7 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Error al crear el viaje.");
+      setError(body.message ?? body.error ?? "Error al crear el viaje.");
       return;
     }
 

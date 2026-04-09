@@ -62,8 +62,14 @@ export default auth((req) => {
     return NextResponse.redirect(dest);
   }
 
-  // Public landing page → let through.
-  if (pathname === "/") return NextResponse.next();
+  // Public landing page — unauthenticated allowed through; authenticated users
+  // are sent directly to their dashboard so they never get stuck on "/".
+  if (pathname === "/") {
+    const dest = req.nextUrl.clone();
+    dest.pathname = dashboard;
+    dest.search   = "";
+    return NextResponse.redirect(dest);
+  }
 
   // Protected route that doesn't belong to this role → redirect to own dashboard.
   if (!isAllowedPath(role, pathname)) {

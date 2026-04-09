@@ -15,13 +15,18 @@ import { CreateGroupBookingSchema } from "@/modules/group-bookings/schema";
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json(
+        { code: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 },
+      );
+    }
 
     assertRole(session.user.role, ["EMPRESA"]);
 
     if (!session.user.employerId) {
       return NextResponse.json(
-        { error: "Tu cuenta no tiene empleador asignado." },
+        { code: "FORBIDDEN", message: "Tu cuenta no tiene empleador asignado." },
         { status: 403 },
       );
     }
@@ -30,7 +35,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const parsed = CreateGroupBookingSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Datos inválidos.", details: parsed.error.flatten() },
+        { code: "VALIDATION_ERROR", message: "Datos inválidos." },
         { status: 400 },
       );
     }
@@ -44,17 +49,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(booking, { status: 201 });
   } catch (err) {
     if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
+      return NextResponse.json(
+        { code: err.code, message: err.message },
+        { status: err.statusCode },
+      );
     }
     console.error("[POST /api/group-bookings]", err);
-    return NextResponse.json({ error: "Error interno." }, { status: 500 });
+    return NextResponse.json(
+      { code: "INTERNAL_ERROR", message: "Error interno." },
+      { status: 500 },
+    );
   }
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json(
+        { code: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 },
+      );
+    }
 
     assertRole(session.user.role, ["EMPRESA", "UABL"]);
 
@@ -63,7 +79,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     if (session.user.role === "UABL") {
       if (!tripId) {
-        return NextResponse.json({ error: "Se requiere tripId." }, { status: 400 });
+        return NextResponse.json(
+          { code: "VALIDATION_ERROR", message: "Se requiere tripId." },
+          { status: 400 },
+        );
       }
       const bookings = await listGroupBookingsByTrip(session.user.companyId, tripId);
       return NextResponse.json(bookings);
@@ -80,8 +99,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(bookings);
   } catch (err) {
     if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
+      return NextResponse.json(
+        { code: err.code, message: err.message },
+        { status: err.statusCode },
+      );
     }
-    return NextResponse.json({ error: "Error interno." }, { status: 500 });
+    return NextResponse.json(
+      { code: "INTERNAL_ERROR", message: "Error interno." },
+      { status: 500 },
+    );
   }
 }

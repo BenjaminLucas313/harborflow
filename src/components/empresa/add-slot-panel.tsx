@@ -2,12 +2,15 @@
 
 // AddSlotPanel — EMPRESA component to add a passenger to a GroupBooking.
 // Includes live search for USUARIO accounts by name.
+// Department is selected first to filter work types — per business rule:
+// sector is chosen per-slot, not fixed to the employer.
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Search, UserPlus, X } from "lucide-react";
 
 type UsuarioResult = { id: string; firstName: string; lastName: string };
+type Department    = { id: string; name: string };
 type WorkType      = { id: string; name: string; code: string; departmentId: string };
 
 type Props = {
@@ -16,25 +19,35 @@ type Props = {
 
 export function AddSlotPanel({ bookingId }: Props) {
   const router = useRouter();
-  const [open, setOpen]                     = useState(false);
-  const [query, setQuery]                   = useState("");
-  const [results, setResults]               = useState<UsuarioResult[]>([]);
-  const [selected, setSelected]             = useState<UsuarioResult | null>(null);
-  const [workTypes, setWorkTypes]           = useState<WorkType[]>([]);
-  const [workTypeId, setWorkTypeId]         = useState("");
-  const [representedCompany, setRepComp]   = useState("");
-  const [loading, setLoading]               = useState(false);
-  const [error, setError]                   = useState<string | null>(null);
-  const debounceRef                         = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [open, setOpen]                   = useState(false);
+  const [query, setQuery]                 = useState("");
+  const [results, setResults]             = useState<UsuarioResult[]>([]);
+  const [selected, setSelected]           = useState<UsuarioResult | null>(null);
+  const [departments, setDepartments]     = useState<Department[]>([]);
+  const [departmentId, setDepartmentId]   = useState("");
+  const [workTypes, setWorkTypes]         = useState<WorkType[]>([]);
+  const [workTypeId, setWorkTypeId]       = useState("");
+  const [representedCompany, setRepComp] = useState("");
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
+  const debounceRef                       = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load work types once on open.
+  // Load departments and all work types once on open.
   async function onOpen() {
     setOpen(true);
-    if (workTypes.length === 0) {
-      const res = await fetch("/api/work-types");
-      if (res.ok) setWorkTypes(await res.json());
+    if (departments.length === 0) {
+      const [deptRes, wtRes] = await Promise.all([
+        fetch("/api/departments"),
+        fetch("/api/work-types"),
+      ]);
+      if (deptRes.ok) setDepartments(await deptRes.json());
+      if (wtRes.ok)   setWorkTypes(await wtRes.json());
     }
   }
+
+  const filteredWorkTypes = departmentId
+    ? workTypes.filter((wt) => wt.departmentId === departmentId)
+    : workTypes;
 
   const onQueryChange = useCallback((value: string) => {
     setQuery(value);
@@ -54,8 +67,8 @@ export function AddSlotPanel({ bookingId }: Props) {
   }
 
   async function handleAdd() {
-    if (!selected) { setError("Seleccioná un usuario de la lista."); return; }
-    if (!workTypeId) { setError("Seleccioná el tipo de trabajo."); return; }
+    if (!selected)                 { setError("Seleccioná un usuario de la lista."); return; }
+    if (!workTypeId)               { setError("Seleccioná el tipo de trabajo."); return; }
     if (!representedCompany.trim()) { setError("Ingresá la empresa que representa."); return; }
 
     setLoading(true);
@@ -73,13 +86,14 @@ export function AddSlotPanel({ bookingId }: Props) {
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Error al agregar el pasajero.");
+      setError(body.message ?? body.error ?? "Error al agregar el pasajero.");
       return;
     }
 
     // Reset form and refresh.
     setSelected(null);
     setQuery("");
+    setDepartmentId("");
     setWorkTypeId("");
     setRepComp("");
     setResults([]);
@@ -146,7 +160,24 @@ export function AddSlotPanel({ bookingId }: Props) {
         )}
       </div>
 
-      {/* Work type */}
+      {/* Department selector — determines which sector this slot belongs to */}
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground">
+          Sector / departamento
+        </label>
+        <select
+          value={departmentId}
+          onChange={(e) => { setDepartmentId(e.target.value); setWorkTypeId(""); }}
+          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">Todos los sectores</option>
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>{d.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Work type — filtered by selected department */}
       <div className="space-y-1">
         <label className="text-xs font-medium text-muted-foreground">Tipo de trabajo</label>
         <select
@@ -155,7 +186,7 @@ export function AddSlotPanel({ bookingId }: Props) {
           className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="">Seleccioná un tipo…</option>
-          {workTypes.map((wt) => (
+          {filteredWorkTypes.map((wt) => (
             <option key={wt.id} value={wt.id}>{wt.name} ({wt.code})</option>
           ))}
         </select>

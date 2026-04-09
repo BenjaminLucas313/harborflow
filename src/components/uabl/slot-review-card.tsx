@@ -38,7 +38,7 @@ export function SlotReviewCard({ slot }: Props) {
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Error al procesar la acción.");
+      setError(body.message ?? body.error ?? "Error al procesar la acción.");
       return;
     }
 

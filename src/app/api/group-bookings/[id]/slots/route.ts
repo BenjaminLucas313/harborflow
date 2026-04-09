@@ -16,19 +16,27 @@ export async function POST(
 ): Promise<NextResponse> {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json(
+        { code: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 },
+      );
+    }
 
     assertRole(session.user.role, ["EMPRESA"]);
 
     if (!session.user.employerId) {
-      return NextResponse.json({ error: "Sin empleador asignado." }, { status: 403 });
+      return NextResponse.json(
+        { code: "FORBIDDEN", message: "Sin empleador asignado." },
+        { status: 403 },
+      );
     }
 
     const body = await req.json();
     const parsed = AddSlotSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Datos inválidos.", details: parsed.error.flatten() },
+        { code: "VALIDATION_ERROR", message: "Datos inválidos." },
         { status: 400 },
       );
     }
@@ -43,10 +51,16 @@ export async function POST(
     return NextResponse.json(slot, { status: 201 });
   } catch (err) {
     if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
+      return NextResponse.json(
+        { code: err.code, message: err.message },
+        { status: err.statusCode },
+      );
     }
     console.error("[POST /api/group-bookings/[id]/slots]", err);
-    return NextResponse.json({ error: "Error interno." }, { status: 500 });
+    return NextResponse.json(
+      { code: "INTERNAL_ERROR", message: "Error interno." },
+      { status: 500 },
+    );
   }
 }
 
@@ -56,14 +70,22 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session) {
+      return NextResponse.json(
+        { code: "UNAUTHORIZED", message: "Authentication required." },
+        { status: 401 },
+      );
+    }
 
     assertRole(session.user.role, ["EMPRESA", "UABL"]);
 
     const { id } = await params;
     const booking = await findGroupBookingById(id);
     if (!booking || booking.companyId !== session.user.companyId) {
-      return NextResponse.json({ error: "Reserva no encontrada." }, { status: 404 });
+      return NextResponse.json(
+        { code: "GROUP_BOOKING_NOT_FOUND", message: "Reserva no encontrada." },
+        { status: 404 },
+      );
     }
 
     const slots = await listSlotsByTrip(session.user.companyId, booking.tripId);
@@ -72,8 +94,14 @@ export async function GET(
     return NextResponse.json(filtered);
   } catch (err) {
     if (err instanceof AppError) {
-      return NextResponse.json({ error: err.message, code: err.code }, { status: err.statusCode });
+      return NextResponse.json(
+        { code: err.code, message: err.message },
+        { status: err.statusCode },
+      );
     }
-    return NextResponse.json({ error: "Error interno." }, { status: 500 });
+    return NextResponse.json(
+      { code: "INTERNAL_ERROR", message: "Error interno." },
+      { status: 500 },
+    );
   }
 }

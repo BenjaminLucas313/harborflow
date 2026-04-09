@@ -2,8 +2,8 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { signIn, getSession } from "next-auth/react";
+import { dashboardForRole } from "@/lib/routes";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 
@@ -14,7 +14,6 @@ import { Label } from "@/components/ui/label";
 
 export function LoginForm() {
   const t = useTranslations("auth.login");
-  const router = useRouter();
 
   const {
     register,
@@ -38,9 +37,21 @@ export function LoginForm() {
       return;
     }
 
-    // Step 7 (route protection) will handle role-based destination logic.
-    router.push("/");
-    router.refresh();
+    // getSession() fetches /api/auth/session with the freshly-set JWT cookie.
+    // If it races (returns null), we fall back to "/" and let middleware redirect.
+    const session = await getSession();
+    const role    = session?.user?.role;
+    const dest    = role ? dashboardForRole(role) : "/";
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[login] signIn ok. session role:", role ?? "(null — middleware will redirect)");
+      console.log("[login] → navigating to:", dest);
+    }
+
+    // Hard navigation so edge middleware runs and can redirect based on the JWT cookie.
+    // router.push() is a soft (RSC) navigation that bypasses middleware, causing
+    // authenticated users to land on "/" without being sent to their dashboard.
+    window.location.replace(dest);
   };
 
   return (

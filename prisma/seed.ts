@@ -271,7 +271,17 @@ async function main() {
     const hash = await bcrypt.hash(def.password, ROUNDS);
     const user = await prisma.user.upsert({
       where:  { companyId_email: { companyId: company.id, email: def.email } },
-      update: {},
+      // Always sync role + V2 fields so re-seeding fixes any stale/legacy values.
+      update: {
+        role:         def.role,
+        firstName:    def.firstName,
+        lastName:     def.lastName,
+        passwordHash: hash,
+        isActive:     true,
+        ...("departmentId" in def ? { departmentId: def.departmentId } : {}),
+        ...("employerId"   in def ? { employerId:   def.employerId }   : {}),
+        ...("isUablAdmin"  in def ? { isUablAdmin:  def.isUablAdmin }  : {}),
+      },
       create: {
         companyId:    company.id,
         email:        def.email,

@@ -68,6 +68,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
 
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[authorize] user=${email} companySlug=${companySlug} role=${user.role} id=${user.id}`);
+        }
+
         // 5. Return the user object that Auth.js will embed in the JWT.
         //    passwordHash is intentionally excluded.
         return {
