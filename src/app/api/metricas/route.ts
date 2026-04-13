@@ -25,7 +25,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const session = await auth();
     if (!session) return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "No autorizado." } }, { status: 401 });
 
-    assertRole(session.user.role, ["ADMIN"]);
+    assertRole(session.user.role, ["ADMIN", "UABL"]);
 
     const { searchParams } = new URL(req.url);
     const { mes: defaultMes, anio: defaultAnio } = argNow();
