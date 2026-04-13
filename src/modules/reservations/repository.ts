@@ -143,6 +143,6 @@ export async function listReservationsByTrip(
   return prisma.reservation.findMany({
     where: { tripId, companyId, status: { in: ACTIVE_RESERVATION_STATUSES } },
     select: RESERVATION_SELECT,
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
   });
 }

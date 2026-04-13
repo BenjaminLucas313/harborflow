@@ -99,7 +99,7 @@ export async function listTripsByBranch(
       status: filter.status ? filter.status : { in: NON_TERMINAL_STATUSES },
     },
     select: TRIP_SELECT,
-    orderBy: { departureTime: "asc" },
+    orderBy: { createdAt: "desc" },
   });
 }
 

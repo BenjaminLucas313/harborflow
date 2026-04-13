@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { dashboardForRole } from "@/lib/routes";
 import { redirect } from "next/navigation";
 import { AppNav } from "@/components/layout/app-nav";
+import { PortBannerSsr } from "@/components/puerto/PortBannerSsr";
 
 export default async function AdminLayout({
   children,
@@ -34,6 +35,7 @@ export default async function AdminLayout({
         companyName={company?.name}
         homeHref="/admin"
       />
+      <PortBannerSsr companyId={companyId} />
       {children}
     </div>
   );

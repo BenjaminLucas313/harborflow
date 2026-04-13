@@ -26,7 +26,7 @@ export async function listSlotsByTrip(
       usuario:  { select: { firstName: true, lastName: true, email: true } },
       workType: { select: { name: true, code: true } },
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
   });
 }
 
@@ -46,7 +46,7 @@ export async function listSlotsByDepartment(
       usuario:  { select: { firstName: true, lastName: true, email: true } },
       workType: { select: { name: true, code: true } },
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
   });
 }
 

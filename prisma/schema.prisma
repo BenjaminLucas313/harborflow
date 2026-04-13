@@ -183,6 +183,10 @@ enum AuditAction {
   TRIP_REQUEST_ACCEPTED
   TRIP_REQUEST_REJECTED
   TRIP_REQUEST_CANCELLED
+  // ── V2: Liquidación de asientos ───────────────────────────────────────────
+  LIQUIDACION_CALCULADA
+  LIQUIDACION_RECALCULADA
+  VIAJE_MARCADO_PASADO
 }
 
 /// Status lifecycle for on-demand boat requests submitted by EMPRESA.
@@ -197,6 +201,25 @@ enum TripRequestStatus {
   REJECTED
   CANCELLED
   FULFILLED
+}
+
+/// Lifecycle state of a trip from the liquidation module's perspective.
+///
+/// This is distinct from TripStatus (which tracks operational state) and
+/// is used exclusively by the settlement/liquidation flow.
+///
+/// ACTIVO   : Trip is upcoming or currently in progress — not yet eligible for liquidation.
+/// PASADO   : Trip has been completed (departed/completed) — eligible for liquidation calculation.
+/// CANCELADO: Trip was cancelled — excluded from liquidation.
+///
+/// Transition rules:
+///   - Set to PASADO when TripStatus transitions to DEPARTED or COMPLETED.
+///   - Set to CANCELADO when TripStatus transitions to CANCELLED.
+///   - Only trips in PASADO state can have AsientoLiquidacion records calculated.
+enum ViajeStatus {
+  ACTIVO
+  PASADO
+  CANCELADO
 }
 
 // =============================================================================
@@ -233,6 +256,7 @@ model Company {
   checkIns            CheckIn[]
   auditLogs           AuditLog[]
   tripRequests        TripRequest[]
+  asientosLiquidacion AsientoLiquidacion[]
 }
 
 /// Operational location (port / dock / service point) within a company.
@@ -259,6 +283,7 @@ model Branch {
   groupBookings      GroupBooking[]
   passengerSlots     PassengerSlot[]
   tripRequests       TripRequest[]
+  asientosLiquidacion AsientoLiquidacion[]
 
   @@index([companyId])
 }
@@ -368,21 +393,27 @@ model Employer {
 /// Each department is responsible for reviewing slots with WorkTypes assigned to it.
 /// The set of departments is fixed/stable — changes require UABL admin action.
 model Department {
-  id          String   @id @default(cuid())
-  companyId   String
-  name        String
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  companyId     String
+  name          String
+  description   String?
+  /// Contact email for the department (used for liquidation notifications). Nullable.
+  emailContacto String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  company        Company         @relation(fields: [companyId], references: [id])
+  company        Company              @relation(fields: [companyId], references: [id])
   /// Work types that belong to this department.
   workTypes      WorkType[]
   /// UABL users assigned to review slots for this department.
   users          User[]
   /// Slots assigned to this department (denormalized from workType for query efficiency).
   passengerSlots PassengerSlot[]
+  /// V1 legacy reservations linked to this department (nullable FK on Reservation).
+  reservationsLegacy Reservation[]    @relation("DepartmentReservation")
+  /// Liquidation records for this department (one per trip where the dept had seats).
+  asientosLiquidacion AsientoLiquidacion[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -611,21 +642,30 @@ model Driver {
 /// Seats consumed = COUNT(PassengerSlot WHERE tripId = X AND status IN ('PENDING','CONFIRMED'))
 /// PENDING slots hold capacity. REJECTED and CANCELLED slots release it.
 model Trip {
-  id                   String     @id @default(cuid())
+  id                   String      @id @default(cuid())
   companyId            String
   branchId             String
   boatId               String
   driverId             String?
   departureTime        DateTime
   estimatedArrivalTime DateTime?
-  status               TripStatus @default(SCHEDULED)
+  /// Operational lifecycle status (SCHEDULED → BOARDING → DEPARTED → COMPLETED, etc.)
+  status               TripStatus  @default(SCHEDULED)
   /// Snapshot of boat.capacity at trip creation. Immutable post-creation.
   capacity             Int
-  waitlistEnabled      Boolean    @default(true)
+  waitlistEnabled      Boolean     @default(true)
   statusReason         String?
   notes                String?
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  /// Liquidation lifecycle status. Distinct from operational `status`.
+  /// Transitions: ACTIVO → PASADO (on DEPARTED/COMPLETED) or CANCELADO (on CANCELLED).
+  /// Only trips in PASADO state are eligible for AsientoLiquidacion calculation.
+  viajeStatus          ViajeStatus @default(ACTIVO)
+  /// Flag set to true once AsientoLiquidacion records have been computed for this trip.
+  /// Prevents accidental double-calculation. Reset to false if recalculation is triggered.
+  liquidacionCalculada Boolean     @default(false)
 
   company            Company             @relation(fields: [companyId], references: [id])
   branch             Branch              @relation(fields: [branchId], references: [id])
@@ -641,10 +681,14 @@ model Trip {
   operationalNotices OperationalNotice[]
   /// If this trip was auto-created from a TripRequest on acceptance.
   tripRequest        TripRequest?
+  /// Liquidation records for this trip (one per department that had seats).
+  asientosLiquidacion AsientoLiquidacion[]
 
   @@index([branchId, departureTime, status])
   @@index([companyId, departureTime])
   @@index([companyId, status])
+  /// Query trips eligible for liquidation calculation.
+  @@index([companyId, viajeStatus, liquidacionCalculada])
 }
 
 // =============================================================================
@@ -698,6 +742,74 @@ model TripRequest {
 }
 
 // =============================================================================
+// ASIENTO LIQUIDACION — Seat settlement per trip per department
+// =============================================================================
+
+/// Settlement record for one department's proportional seat cost on a single trip.
+///
+/// BUSINESS RULE:
+/// --------------
+/// After a trip is completed (viajeStatus = PASADO), the liquidation engine:
+///   1. Counts reserved seats per department (asientosReservados).
+///   2. Calculates each department's proportional share of empty seats:
+///        fraccionVacios = vacios * (asientosReservados[dept] / totalOcupados)
+///   3. Stores totalAsientos = asientosReservados + fraccionVacios.
+///
+/// Example (10 seats, 6 occupied: dept A=3, B=2, C=1 → 4 vacíos):
+///   dept A: fraccionVacios = 4 * (3/6) = 2.0000  → totalAsientos = 5.0000
+///   dept B: fraccionVacios = 4 * (2/6) = 1.3333  → totalAsientos = 3.3333
+///   dept C: fraccionVacios = 4 * (1/6) = 0.6667  → totalAsientos = 1.6667
+///   Sum of totalAsientos = 10 ✓
+///
+/// UNIQUENESS: One record per (trip, department). Recalculation deletes and
+/// recreates the row (handled by the liquidation service).
+///
+/// IMMUTABILITY: Once liquidacionCalculada = true on the parent Trip, records
+/// should not be modified without an explicit LIQUIDACION_RECALCULADA audit event.
+///
+/// NOTE: `anio` uses ASCII spelling of "año" to avoid Unicode identifier issues
+/// in TypeScript tooling.
+model AsientoLiquidacion {
+  id                 String   @id @default(cuid())
+  /// Tenant scope — mandatory for all tenant-owned entities.
+  companyId          String
+  /// Denormalized from viaje.branchId for branch-scoped queries without a JOIN.
+  branchId           String
+  /// The trip this settlement record belongs to.
+  viajeId            String
+  /// The department being charged for seats on this trip.
+  departamentoId     String
+  /// Number of CONFIRMED/PENDING PassengerSlots (or V1 Reservations) for this dept on this trip.
+  asientosReservados Int
+  /// This department's proportional share of the trip's empty seats (4 decimal places).
+  fraccionVacios     Decimal  @db.Decimal(8, 4)
+  /// Final liquidated seats: asientosReservados + fraccionVacios (4 decimal places).
+  totalAsientos      Decimal  @db.Decimal(8, 4)
+  /// Calendar month of the trip departure (1–12). Denormalized for monthly reporting.
+  mes                Int
+  /// Calendar year of the trip departure. Denormalized for monthly reporting.
+  /// (Spelled "anio" to avoid Unicode `ñ` in identifiers.)
+  anio               Int
+  createdAt          DateTime @default(now())
+
+  company      Company    @relation(fields: [companyId], references: [id])
+  branch       Branch     @relation(fields: [branchId], references: [id])
+  viaje        Trip       @relation(fields: [viajeId], references: [id])
+  departamento Department @relation(fields: [departamentoId], references: [id])
+
+  /// One settlement record per trip per department.
+  @@unique([viajeId, departamentoId])
+  /// Monthly liquidation summary per company.
+  @@index([companyId, anio, mes])
+  /// Monthly liquidation summary per branch.
+  @@index([branchId, anio, mes])
+  /// Monthly totals per department.
+  @@index([departamentoId, anio, mes])
+  /// All liquidation records for a specific trip.
+  @@index([viajeId])
+}
+
+// =============================================================================
 // RESERVATION (V1 LEGACY — DEPRECATED)
 // =============================================================================
 
@@ -718,16 +830,22 @@ model Reservation {
 
   replacesReservationId String? @unique
 
+  /// V2 addition: links this legacy reservation to the UABL department responsible
+  /// for the passenger (nullable — not set on pre-V2 records).
+  /// Used by the liquidation module to attribute legacy seat consumption to a department.
+  departamentoId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id])
-  branch  Branch  @relation(fields: [branchId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
-  trip    Trip    @relation(fields: [tripId], references: [id])
+  company      Company      @relation(fields: [companyId], references: [id])
+  branch       Branch       @relation(fields: [branchId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  trip         Trip         @relation(fields: [tripId], references: [id])
+  departamento Department?  @relation("DepartmentReservation", fields: [departamentoId], references: [id])
 
-  replacesReservation   Reservation?  @relation("ReplacementChain", fields: [replacesReservationId], references: [id])
-  replacedByReservation Reservation?  @relation("ReplacementChain")
+  replacesReservation   Reservation?   @relation("ReplacementChain", fields: [replacesReservationId], references: [id])
+  replacedByReservation Reservation?   @relation("ReplacementChain")
   promotedFromWaitlist  WaitlistEntry? @relation("WaitlistPromotion")
   checkIn               CheckIn?
 
@@ -736,6 +854,7 @@ model Reservation {
   @@index([companyId, userId])
   @@index([companyId, tripId])
   @@index([branchId, status])
+  @@index([departamentoId])
 }
 
 // =============================================================================

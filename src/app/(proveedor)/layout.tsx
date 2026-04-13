@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { dashboardForRole } from "@/lib/routes";
 import { redirect } from "next/navigation";
 import { AppNav } from "@/components/layout/app-nav";
+import { PortBannerSsr } from "@/components/puerto/PortBannerSsr";
 
 export default async function ProveedorLayout({
   children,
@@ -30,6 +31,7 @@ export default async function ProveedorLayout({
         companyName={company?.name}
         homeHref="/proveedor"
       />
+      <PortBannerSsr companyId={companyId} />
       {children}
     </div>
   );

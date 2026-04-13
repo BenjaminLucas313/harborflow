@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:mark-past-dry": "cross-env DRY_RUN=true tsx prisma/scripts/mark-past-trips.ts",
+    "db:mark-past": "cross-env DRY_RUN=false tsx prisma/scripts/mark-past-trips.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
@@ -25,6 +29,7 @@
     "react": "latest",
     "react-dom": "latest",
     "react-hook-form": "^7.72.0",
+    "recharts": "^3.8.1",
     "resend": "^6.10.0",
     "shadcn": "^4.1.2",
     "tailwind-merge": "^3.5.0",
@@ -42,11 +47,13 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "latest",
     "prisma": "^7.6.0",
     "tailwindcss": "^4",
     "tsx": "^4.19.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.4"
   }
 }

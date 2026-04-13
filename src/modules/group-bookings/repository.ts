@@ -31,7 +31,7 @@ export async function listGroupBookingsByTrip(
   return prisma.groupBooking.findMany({
     where:   { companyId, tripId },
     include: { passengerSlots: true },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
   });
 }
 

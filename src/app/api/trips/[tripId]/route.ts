@@ -1,13 +1,22 @@
 // PATCH /api/trips/[tripId] — update trip status (PROVEEDOR only)
 //   Body: { status: TripStatus }
+//
+// Side effect: when status transitions to COMPLETED or DEPARTED, viajeStatus is
+// automatically set to PASADO so liquidation workflows can detect settled trips.
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { TripStatus } from "@prisma/client";
+import { TripStatus, ViajeStatus } from "@prisma/client";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAction } from "@/modules/audit/repository";
+
+/** Trip operational statuses that mark a trip as completed (viaje pasado). */
+const TERMINAL_VIAJE_STATUSES: TripStatus[] = [
+  TripStatus.COMPLETED,
+  TripStatus.DEPARTED,
+];
 
 const BodySchema = z.object({
   status: z.enum(Object.values(TripStatus) as [string, ...string[]]),
@@ -51,10 +60,18 @@ export async function PATCH(
     return NextResponse.json({ error: "Viaje no encontrado." }, { status: 404 });
   }
 
+  const newStatus = parsed.data.status as TripStatus;
+  const isTerminal = TERMINAL_VIAJE_STATUSES.includes(newStatus);
+
   const updated = await prisma.trip.update({
     where: { id: tripId },
-    data:  { status: parsed.data.status as TripStatus },
-    select: { id: true, status: true },
+    data:  {
+      status: newStatus,
+      // Auto-mark as PASADO when the trip completes so the liquidation job
+      // and calcularDistribucionViaje can process it without a separate step.
+      ...(isTerminal ? { viajeStatus: ViajeStatus.PASADO } : {}),
+    },
+    select: { id: true, status: true, viajeStatus: true },
   });
 
   logAction({

@@ -59,6 +59,19 @@ function futureDate(dayOffset: number, hour: number, minute = 0): Date {
   return d;
 }
 
+/** Returns a Date at HH:MM UTC, N calendar days in the past. */
+function pastDate(dayOffset: number, hour: number, minute = 0): Date {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - dayOffset);
+  d.setUTCHours(hour, minute, 0, 0);
+  return d;
+}
+
+/** Extracts calendar month (1-12) and year from a UTC Date. */
+function getMesAnio(date: Date): { mes: number; anio: number } {
+  return { mes: date.getUTCMonth() + 1, anio: date.getUTCFullYear() };
+}
+
 // ---------------------------------------------------------------------------
 // Seed
 // ---------------------------------------------------------------------------
@@ -91,22 +104,30 @@ async function main() {
   console.log(`✓ Branch     : ${branch.name}`);
 
   // ── 3. Departments ───────────────────────────────────────────────────────
+  // Uses upsert on @@unique([companyId, name]) so re-running never duplicates
+  // or deletes existing records. update:{} intentionally empty — we only want
+  // to create if absent, never overwrite manual changes made post-seed.
   const deptDefs = [
-    { name: "Operaciones",   description: "Carga, descarga y logística portuaria" },
-    { name: "Mantenimiento", description: "Mantenimiento eléctrico y mecánico" },
-    { name: "Seguridad",     description: "Guardia y vigilancia portuaria" },
+    { name: "Operaciones",     description: "Carga, descarga y logística portuaria",   emailContacto: "operaciones@uabl.dev"   },
+    { name: "Mantenimiento",   description: "Mantenimiento eléctrico y mecánico",      emailContacto: "mantenimiento@uabl.dev" },
+    { name: "Seguridad",       description: "Guardia y vigilancia portuaria",          emailContacto: "seguridad@uabl.dev"     },
+    { name: "Limpieza",        description: "Limpieza y saneamiento de instalaciones", emailContacto: "limpieza@uabl.dev"      },
+    { name: "Servicios Extras",description: "Servicios complementarios y soporte",     emailContacto: null                     },
   ];
 
   const depts: Record<string, { id: string; name: string }> = {};
   for (const def of deptDefs) {
-    let dept = await prisma.department.findFirst({
-      where: { companyId: company.id, name: def.name },
+    const dept = await prisma.department.upsert({
+      where:  { companyId_name: { companyId: company.id, name: def.name } },
+      update: {},
+      create: {
+        companyId:     company.id,
+        name:          def.name,
+        description:   def.description,
+        emailContacto: def.emailContacto,
+        isActive:      true,
+      },
     });
-    if (!dept) {
-      dept = await prisma.department.create({
-        data: { companyId: company.id, name: def.name, description: def.description, isActive: true },
-      });
-    }
     depts[def.name] = dept;
     console.log(`✓ Dept       : ${dept.name}`);
   }
@@ -547,6 +568,186 @@ async function main() {
     console.log(`✓ TripRequest 2: already exists`);
   }
 
+  // ── 12. Past trips for liquidation testing ───────────────────────────────
+  // Two completed trips with viajeStatus=PASADO.
+  //   Viaje pasado 1 → will get AsientoLiquidacion records (liquidacionCalculada=true)
+  //   Viaje pasado 2 → left without records (liquidacionCalculada=false, "pending")
+  // Boat capacities: Lancha Río Grande=8, Lancha Delta=6.
+  // mainBoat (boats[0]) already declared in section 9.
+
+  console.log("");
+  const deltaBoat = boats[1]!;
+
+  const depT1 = pastDate(10, 8,  0);
+  const depT2 = pastDate(5,  14, 0);
+
+  let pastTrip1 = await prisma.trip.findFirst({
+    where: { companyId: company.id, branchId: branch.id, departureTime: depT1 },
+  });
+  if (!pastTrip1) {
+    pastTrip1 = await prisma.trip.create({
+      data: {
+        companyId:            company.id,
+        branchId:             branch.id,
+        boatId:               mainBoat.id,
+        driverId:             driver.id,
+        departureTime:        depT1,
+        estimatedArrivalTime: pastDate(10, 9, 0),
+        status:               "COMPLETED",
+        viajeStatus:          "PASADO",
+        liquidacionCalculada: true,   // will receive AsientoLiquidacion records below
+        capacity:             mainBoat.capacity,
+        waitlistEnabled:      false,
+        notes:                "Seed: viaje pasado — liquidación calculada (cap 8, 4 ocupados)",
+      },
+    });
+  }
+  console.log(`✓ Viaje pasado 1: ${depT1.toISOString().slice(0, 10)} 08:00 — cap ${mainBoat.capacity} (id: ${pastTrip1.id})`);
+
+  let pastTrip2 = await prisma.trip.findFirst({
+    where: { companyId: company.id, branchId: branch.id, departureTime: depT2 },
+  });
+  if (!pastTrip2) {
+    pastTrip2 = await prisma.trip.create({
+      data: {
+        companyId:            company.id,
+        branchId:             branch.id,
+        boatId:               deltaBoat.id,
+        driverId:             driver.id,
+        departureTime:        depT2,
+        estimatedArrivalTime: pastDate(5, 15, 0),
+        status:               "COMPLETED",
+        viajeStatus:          "PASADO",
+        liquidacionCalculada: false,  // left pending — no AsientoLiquidacion yet
+        capacity:             deltaBoat.capacity,
+        waitlistEnabled:      false,
+        notes:                "Seed: viaje pasado — liquidación pendiente (cap 6, 2 ocupados)",
+      },
+    });
+  }
+  console.log(`✓ Viaje pasado 2: ${depT2.toISOString().slice(0, 10)} 14:00 — cap ${deltaBoat.capacity} (id: ${pastTrip2.id})`);
+
+  // ── 13. Sample reservations on past trips (V1 legacy model) ──────────────
+  // Creates CHECKED_IN reservations with departamentoId set so the liquidation
+  // engine has seat-per-department data to read.
+  //
+  // Viaje pasado 1 — 4 seats occupied (capacity 8, 4 vacant):
+  //   Mantenimiento   → juan, maria  (2 seats)
+  //   Limpieza        → pedro        (1 seat)
+  //   Servicios Extras→ lucia        (1 seat)
+  //
+  // Viaje pasado 2 — 2 seats occupied (capacity 6, 4 vacant):
+  //   Mantenimiento   → juan         (1 seat)
+  //   Limpieza        → pedro        (1 seat)
+  //
+  // Only creates records where none exist yet (idempotent via findFirst check).
+  // Does NOT overwrite existing reservations that already have departamentoId.
+
+  console.log("");
+  const reservationDefs = [
+    // ── Viaje pasado 1 ──────────────────────────────────────────────────────
+    { trip: pastTrip1, user: createdUsers["usuario.juan"]!,   dept: "Mantenimiento"   },
+    { trip: pastTrip1, user: createdUsers["usuario.maria"]!,  dept: "Mantenimiento"   },
+    { trip: pastTrip1, user: createdUsers["usuario.pedro"]!,  dept: "Limpieza"        },
+    { trip: pastTrip1, user: createdUsers["usuario.lucia"]!,  dept: "Servicios Extras"},
+    // ── Viaje pasado 2 ──────────────────────────────────────────────────────
+    { trip: pastTrip2, user: createdUsers["usuario.juan"]!,   dept: "Mantenimiento"   },
+    { trip: pastTrip2, user: createdUsers["usuario.pedro"]!,  dept: "Limpieza"        },
+  ];
+
+  for (const def of reservationDefs) {
+    const existing = await prisma.reservation.findFirst({
+      where: { companyId: company.id, tripId: def.trip.id, userId: def.user.id },
+    });
+    if (!existing) {
+      await prisma.reservation.create({
+        data: {
+          companyId:     company.id,
+          branchId:      branch.id,
+          userId:        def.user.id,
+          tripId:        def.trip.id,
+          departamentoId: depts[def.dept]!.id,
+          status:        "CHECKED_IN",
+        },
+      });
+    }
+    const userName = def.user.email.split("@")[0];
+    console.log(`✓ Reserva    : ${userName} — ${def.dept} en viaje ${def.trip.id.slice(-6)}`);
+  }
+
+  // Defensive: assign fallback department to any remaining V1 reservations
+  // that still have departamentoId = null (e.g. pre-seed prod data).
+  // Uses Mantenimiento as a conservative default. This only fires if null
+  // records exist — never overwrites an already-set departamentoId.
+  const fallbackDept   = depts["Mantenimiento"]!;
+  const updatedNulls   = await prisma.reservation.updateMany({
+    where: { companyId: company.id, departamentoId: null },
+    data:  { departamentoId: fallbackDept.id },
+  });
+  if (updatedNulls.count > 0) {
+    console.log(`⚠  Fallback   : ${updatedNulls.count} reserva(s) sin departamento asignadas a Mantenimiento`);
+  }
+
+  // ── 14. AsientoLiquidacion examples (viaje pasado 1 only) ────────────────
+  // Demonstrates the proportional distribution formula:
+  //   fraccionVacios[dept] = vacíos * (asientosReservados[dept] / totalOcupados)
+  //   totalAsientos[dept]  = asientosReservados[dept] + fraccionVacios[dept]
+  //
+  // Viaje pasado 1 — capacity=8, occupied=4, vacant=4:
+  //   Mantenimiento   : 4 * (2/4) = 2.0000  → total 4.0000
+  //   Limpieza        : 4 * (1/4) = 1.0000  → total 2.0000
+  //   Servicios Extras: 4 * (1/4) = 1.0000  → total 2.0000
+  //   Σ totalAsientos = 8 ✓
+  //
+  // Viaje pasado 2 has NO records (liquidacionCalculada=false) — tests the
+  // "pending liquidation" query path.
+
+  console.log("");
+  const { mes: mesPT1, anio: anioPT1 } = getMesAnio(pastTrip1.departureTime);
+
+  const liquidacionDefs = [
+    {
+      departamento:      "Mantenimiento",
+      asientosReservados: 2,
+      fraccionVacios:    "2.0000",
+      totalAsientos:     "4.0000",
+    },
+    {
+      departamento:      "Limpieza",
+      asientosReservados: 1,
+      fraccionVacios:    "1.0000",
+      totalAsientos:     "2.0000",
+    },
+    {
+      departamento:      "Servicios Extras",
+      asientosReservados: 1,
+      fraccionVacios:    "1.0000",
+      totalAsientos:     "2.0000",
+    },
+  ];
+
+  for (const def of liquidacionDefs) {
+    const deptId = depts[def.departamento]!.id;
+    await prisma.asientoLiquidacion.upsert({
+      where:  { viajeId_departamentoId: { viajeId: pastTrip1.id, departamentoId: deptId } },
+      update: {},
+      create: {
+        companyId:          company.id,
+        branchId:           branch.id,
+        viajeId:            pastTrip1.id,
+        departamentoId:     deptId,
+        asientosReservados: def.asientosReservados,
+        fraccionVacios:     def.fraccionVacios,
+        totalAsientos:      def.totalAsientos,
+        mes:                mesPT1,
+        anio:               anioPT1,
+      },
+    });
+    console.log(
+      `✓ Liquidación: ${def.departamento.padEnd(15)} | reserv=${def.asientosReservados} | fracc=${def.fraccionVacios} | total=${def.totalAsientos}`
+    );
+  }
+
   // ── Summary ──────────────────────────────────────────────────────────────
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -579,6 +780,16 @@ async function main() {
    Req 1: Constructora Norte  — Terminal Norte → Dársena Sur (4 pasajeros)
    Req 2: Servicios Portuarios — Muelle Central → Zona Franca (2 pasajeros)
 
+ Departments (5 total)
+   Operaciones, Mantenimiento, Seguridad, Limpieza, Servicios Extras
+
+ Viajes pasados (liquidación)
+   Viaje pasado 1 → COMPLETED, liquidacionCalculada=true
+     cap=8, ocupados=4 (Mant×2, Limp×1, ServExtra×1), vacíos=4
+     AsientoLiquidacion: Mant=4.0, Limp=2.0, ServExtra=2.0 ✓
+   Viaje pasado 2 → COMPLETED, liquidacionCalculada=false (pendiente)
+     cap=6, ocupados=2 (Mant×1, Limp×1), sin registros aún
+
  TESTING CHECKLIST
  ─────────────────
  □ Log in as uabl.operaciones   → see pending slot for Juan Pérez
@@ -590,6 +801,8 @@ async function main() {
  □ Proveedor acepta TripRequest → Trip se crea automáticamente
  □ Log in as uabl.admin         → manage departamentos + tipos de trabajo
  □ Log in as juan.perez         → see Trip 1 as assigned (read-only)
+ □ Query AsientoLiquidacion     → verify proportional distribution (Σ=8)
+ □ Query trips WHERE liquidacionCalculada=false AND viajeStatus=PASADO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `);
 }

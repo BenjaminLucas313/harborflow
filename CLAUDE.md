@@ -337,3 +337,10 @@ Skills are located in `.claude/skills/`. Claude should consult the relevant skil
 - `port-operations` — (ya existente)
 - `project-overview` — (ya existente)
 - `reservation-engine` — (ya existente)
+
+## Reglas generales
+- SIEMPRE leer la skill relevante antes de implementar
+- NUNCA hardcodear strings de estado — usar enums de Prisma
+- SIEMPRE validar fechas con timezone Argentina (UTC-3)
+- Los endpoints de API deben seguir el patrón en `api-design-guide`
+- Toda migración de DB pasa por `db-guardian` primero

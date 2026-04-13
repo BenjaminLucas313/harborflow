@@ -24,6 +24,7 @@ import { Prisma, TripStatus, ReservationStatus, WaitlistStatus } from "@prisma/c
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { logAction } from "@/modules/audit/repository";
+import { isTripAvailable } from "@/lib/date-utils";
 import {
   RESERVATION_SELECT,
   WAITLIST_SELECT,
@@ -97,6 +98,7 @@ export async function bookTrip(input: BookTripInput): Promise<BookingResult> {
       status: true,
       capacity: true,
       waitlistEnabled: true,
+      departureTime: true,
     },
   });
 
@@ -109,6 +111,15 @@ export async function bookTrip(input: BookTripInput): Promise<BookingResult> {
       "TRIP_NOT_BOOKABLE",
       "This trip is not open for reservations.",
       409,
+    );
+  }
+
+  // Reject reservations for trips departing in less than 1 hour.
+  if (!isTripAvailable(trip.departureTime)) {
+    throw new AppError(
+      "TRIP_DEPARTURE_TOO_SOON",
+      "No se puede reservar este viaje: la salida es en menos de 1 hora o ya pasó.",
+      400,
     );
   }
 

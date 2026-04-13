@@ -1,12 +1,17 @@
 // TripRequest service — on-demand boat request flow (EMPRESA → PROVEEDOR).
 //
-// Two core operations:
-//   createTripRequest: EMPRESA submits a request (PENDING)
-//   reviewTripRequest: PROVEEDOR accepts (→ FULFILLED, Trip auto-created) or rejects (→ REJECTED)
+// Three core operations:
+//   createTripRequest:          EMPRESA submits a request (PENDING)
+//   reviewTripRequest:          PROVEEDOR accepts (→ FULFILLED, Trip auto-created) or rejects (→ REJECTED)
+//   cancelTripRequestByOwner:   EMPRESA cancels own request (within cancellation window)
 
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { logAction } from "@/modules/audit/repository";
+import {
+  checkSelfCancellation,
+  CANCELLATION_MESSAGES,
+} from "@/lib/cancellation-policy";
 import {
   createTripRequest as repoCreate,
   findTripRequestById,
@@ -204,6 +209,131 @@ export async function reviewTripRequest(
   }).catch(() => {});
 
   return updatedRequest as unknown as TripRequestWithRelations;
+}
+
+// ---------------------------------------------------------------------------
+// Cancel (EMPRESA — self-service)
+// ---------------------------------------------------------------------------
+
+/**
+ * Cancels a TripRequest on behalf of the EMPRESA user who created it.
+ *
+ * Steps:
+ *   1. Fetch the request — must exist and belong to the caller's company.
+ *   2. Verify ownership: requestedById === actorId.
+ *   3. Guard against already-terminal states (REJECTED, CANCELLED).
+ *   4. Determine the effective departure time:
+ *        - FULFILLED → use the linked Trip.departureTime
+ *        - PENDING   → use requestedDate (the intended trip date)
+ *   5. Check self-cancellation policy (2h window).
+ *   6. Transaction:
+ *        a. Mark TripRequest as CANCELLED.
+ *        b. If FULFILLED (has tripId): cancel all GroupBookings for this company
+ *           on that trip, including ALL their slots (PENDING + CONFIRMED).
+ *           This removes any UABL-approved seats for this company.
+ *   7. Audit log.
+ *
+ * Throws:
+ *   TRIP_REQUEST_NOT_FOUND (404)         — request missing or wrong company/owner
+ *   TRIP_REQUEST_NOT_CANCELLABLE (409)   — already REJECTED or CANCELLED
+ *   CANCELLATION_TOO_LATE (422)          — within 2h or past departure
+ */
+export async function cancelTripRequestByOwner(
+  requestId: string,
+  actorId:   string,
+  companyId: string,
+): Promise<TripRequestWithRelations> {
+  // 1. Fetch with ownership check.
+  const request = await findTripRequestById(requestId, companyId);
+  if (!request) {
+    throw new AppError("TRIP_REQUEST_NOT_FOUND", "Solicitud no encontrada.", 404);
+  }
+
+  // 2. Ownership — only the requester can self-cancel.
+  if (request.requestedById !== actorId) {
+    throw new AppError("TRIP_REQUEST_NOT_FOUND", "Solicitud no encontrada.", 404);
+  }
+
+  // 3. Terminal states cannot be cancelled again.
+  if (request.status === "REJECTED" || request.status === "CANCELLED") {
+    throw new AppError(
+      "TRIP_REQUEST_NOT_CANCELLABLE",
+      "La solicitud ya fue rechazada o cancelada y no puede modificarse.",
+      409,
+    );
+  }
+
+  // 4. Determine departure time for policy check.
+  let departureTime: Date;
+  if (request.status === "FULFILLED" && request.tripId) {
+    const trip = await prisma.trip.findUnique({
+      where:  { id: request.tripId },
+      select: { departureTime: true },
+    });
+    departureTime = trip?.departureTime ?? request.requestedDate;
+  } else {
+    departureTime = request.requestedDate;
+  }
+
+  // 5. Cancellation policy check.
+  const check = checkSelfCancellation(departureTime);
+  if (!check.allowed) {
+    throw new AppError(
+      "CANCELLATION_TOO_LATE",
+      CANCELLATION_MESSAGES[check.reason],
+      422,
+    );
+  }
+
+  // 6. Atomic cancellation.
+  await prisma.$transaction(async (tx) => {
+    // 6a. Cancel the TripRequest.
+    await tx.tripRequest.update({
+      where: { id: requestId },
+      data:  { status: "CANCELLED" },
+    });
+
+    // 6b. If the request was already FULFILLED, cancel all GroupBookings
+    //     created by this company for the associated trip, including their
+    //     PENDING and CONFIRMED slots (removes UABL-approved seats too).
+    if (request.status === "FULFILLED" && request.tripId) {
+      const bookings = await tx.groupBooking.findMany({
+        where:  { tripId: request.tripId, companyId },
+        select: { id: true },
+      });
+
+      const bookingIds = bookings.map((b) => b.id);
+
+      if (bookingIds.length > 0) {
+        // Cancel ALL slots (PENDING + CONFIRMED) — full retraction from UABL.
+        await tx.passengerSlot.updateMany({
+          where: {
+            groupBookingId: { in: bookingIds },
+            status:         { in: ["PENDING", "CONFIRMED"] },
+          },
+          data: { status: "CANCELLED" },
+        });
+
+        await tx.groupBooking.updateMany({
+          where: { id: { in: bookingIds } },
+          data:  { status: "CANCELLED" },
+        });
+      }
+    }
+  });
+
+  // 7. Audit — best-effort.
+  logAction({
+    companyId,
+    actorId,
+    action:     "TRIP_REQUEST_CANCELLED",
+    entityType: "TripRequest",
+    entityId:   requestId,
+    payload:    { status: request.status, tripId: request.tripId ?? null },
+  }).catch(() => {});
+
+  // Return fresh record to reflect new CANCELLED status.
+  return (await findTripRequestById(requestId, companyId))!;
 }
 
 // ---------------------------------------------------------------------------

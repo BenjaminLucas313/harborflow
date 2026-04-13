@@ -9,11 +9,17 @@
 //      From this point, UABL can review each slot.
 //   4. EMPRESA can cancel the booking → status CANCELLED,
 //      all non-confirmed slots → CANCELLED.
+//      cancelGroupBookingByOwner also enforces the 2h self-cancel window and
+//      cancels CONFIRMED slots (full UABL retraction).
 
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { logAction } from "@/modules/audit/repository";
 import { notifySlotAssigned } from "@/lib/notifications";
+import {
+  checkSelfCancellation,
+  CANCELLATION_MESSAGES,
+} from "@/lib/cancellation-policy";
 import {
   findGroupBookingById,
   createGroupBooking as repoCreate,
@@ -321,6 +327,104 @@ export async function cancelGroupBooking(
     entityType: "GroupBooking",
     entityId:   bookingId,
     payload:    {},
+  }).catch(() => {});
+
+  return (await findGroupBookingById(bookingId))!;
+}
+
+// ---------------------------------------------------------------------------
+// Cancel by owner — enforces cancellation policy + full slot retraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Cancels a GroupBooking on behalf of the EMPRESA user who created it.
+ *
+ * This is the *self-service* cancel path, distinct from the existing
+ * `cancelGroupBooking` which is used by the PATCH action flow and only
+ * cancels PENDING slots.
+ *
+ * Steps:
+ *   1. Fetch the booking — must exist and belong to the caller's company.
+ *   2. Verify ownership: bookedById === actorId OR employerId === employerId.
+ *   3. Guard idempotency: already CANCELLED → return as-is.
+ *   4. Fetch the linked trip to determine departure time.
+ *   5. Check self-cancellation policy (2h window).
+ *   6. Transaction:
+ *        a. Cancel ALL slots (PENDING + CONFIRMED) — full UABL retraction.
+ *        b. Mark GroupBooking as CANCELLED.
+ *   7. Audit log.
+ *
+ * Throws:
+ *   GROUP_BOOKING_NOT_FOUND (404)         — booking missing or wrong company/owner
+ *   GROUP_BOOKING_NOT_CANCELLABLE (409)   — already CANCELLED (idempotency guard)
+ *   CANCELLATION_TOO_LATE (422)           — within 2h or past departure
+ */
+export async function cancelGroupBookingByOwner(
+  bookingId:  string,
+  actorId:    string,
+  employerId: string,
+  companyId:  string,
+): Promise<GroupBooking> {
+  // 1. Fetch with company scope.
+  const booking = await findGroupBookingById(bookingId);
+
+  if (!booking || booking.companyId !== companyId) {
+    throw new AppError("GROUP_BOOKING_NOT_FOUND", "Reserva no encontrada.", 404);
+  }
+
+  // 2. Ownership: the booking must belong to the caller's employer.
+  if (booking.bookedById !== actorId && booking.employerId !== employerId) {
+    throw new AppError("GROUP_BOOKING_NOT_FOUND", "Reserva no encontrada.", 404);
+  }
+
+  // 3. Already cancelled — idempotent return.
+  if (booking.status === "CANCELLED") {
+    return booking;
+  }
+
+  // 4. Fetch departure time from the linked trip.
+  const trip = await prisma.trip.findUnique({
+    where:  { id: booking.tripId },
+    select: { departureTime: true },
+  });
+
+  if (!trip) {
+    throw new AppError("TRIP_NOT_FOUND", "Viaje asociado no encontrado.", 404);
+  }
+
+  // 5. Cancellation policy check.
+  const check = checkSelfCancellation(trip.departureTime);
+  if (!check.allowed) {
+    throw new AppError(
+      "CANCELLATION_TOO_LATE",
+      CANCELLATION_MESSAGES[check.reason],
+      422,
+    );
+  }
+
+  // 6. Atomic cancellation — cancel ALL slots including UABL-confirmed ones.
+  await prisma.$transaction([
+    prisma.passengerSlot.updateMany({
+      where: {
+        groupBookingId: bookingId,
+        status:         { in: ["PENDING", "CONFIRMED"] },
+      },
+      data: { status: "CANCELLED" },
+    }),
+    prisma.groupBooking.update({
+      where: { id: bookingId },
+      data:  { status: "CANCELLED" },
+    }),
+  ]);
+
+  // 7. Audit — best-effort.
+  logAction({
+    companyId,
+    actorId,
+    action:     "GROUP_BOOKING_CANCELLED",
+    entityType: "GroupBooking",
+    entityId:   bookingId,
+    payload:    { tripId: booking.tripId, employerId },
   }).catch(() => {});
 
   return (await findGroupBookingById(bookingId))!;
