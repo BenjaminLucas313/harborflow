@@ -1,17 +1,14 @@
-// PATCH /api/group-bookings/[id] — submit or cancel a GroupBooking (EMPRESA only)
-// GET   /api/group-bookings/[id] — get booking detail
+// PATCH /api/trip-requests/[id] — PROVEEDOR accepts or rejects a TripRequest
+// GET   /api/trip-requests/[id] — get request detail (EMPRESA or PROVEEDOR)
 
 import { NextRequest, NextResponse } from "next/server";
+
 import { auth } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
 import { parseZodError } from "@/lib/zod-errors";
 import { assertRole } from "@/lib/permissions";
-import {
-  submitGroupBooking,
-  cancelGroupBooking,
-} from "@/modules/group-bookings/service";
-import { findGroupBookingById } from "@/modules/group-bookings/repository";
-import { GroupBookingActionSchema } from "@/modules/group-bookings/schema";
+import { reviewTripRequest, findTripRequestById } from "@/modules/trip-requests/service";
+import { ReviewTripRequestSchema } from "@/modules/trip-requests/schema";
 
 export async function GET(
   _req: NextRequest,
@@ -26,19 +23,18 @@ export async function GET(
       );
     }
 
-    assertRole(session.user.role, ["EMPRESA", "UABL"]);
+    assertRole(session.user.role, ["EMPRESA", "PROVEEDOR"]);
 
     const { id } = await params;
-    const booking = await findGroupBookingById(id);
-
-    if (!booking || booking.companyId !== session.user.companyId) {
+    const request = await findTripRequestById(id, session.user.companyId);
+    if (!request) {
       return NextResponse.json(
-        { code: "GROUP_BOOKING_NOT_FOUND", message: "Reserva no encontrada." },
+        { code: "NOT_FOUND", message: "Solicitud no encontrada." },
         { status: 404 },
       );
     }
 
-    return NextResponse.json(booking);
+    return NextResponse.json(request);
   } catch (err) {
     if (err instanceof AppError) {
       return NextResponse.json(
@@ -66,37 +62,24 @@ export async function PATCH(
       );
     }
 
-    assertRole(session.user.role, ["EMPRESA"]);
-
-    if (!session.user.employerId) {
-      return NextResponse.json(
-        { code: "FORBIDDEN", message: "Sin empleador asignado." },
-        { status: 403 },
-      );
-    }
+    assertRole(session.user.role, ["PROVEEDOR"]);
 
     const body = await req.json();
-    const parsed = GroupBookingActionSchema.safeParse(body);
+    const parsed = ReviewTripRequestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { code: "VALIDATION_ERROR", message: "Acción inválida.", fields: parseZodError(parsed.error) },
+        { code: "VALIDATION_ERROR", message: "Datos inválidos.", fields: parseZodError(parsed.error) },
         { status: 400 },
       );
     }
 
     const { id } = await params;
-    const ctx = {
-      companyId:  session.user.companyId,
-      employerId: session.user.employerId,
-      bookedById: session.user.id,
-    };
+    const request = await reviewTripRequest(id, parsed.data, {
+      companyId:    session.user.companyId,
+      reviewedById: session.user.id,
+    });
 
-    const result =
-      parsed.data.action === "SUBMIT"
-        ? await submitGroupBooking(id, ctx)
-        : await cancelGroupBooking(id, ctx);
-
-    return NextResponse.json(result);
+    return NextResponse.json(request);
   } catch (err) {
     if (err instanceof AppError) {
       return NextResponse.json(
@@ -104,6 +87,7 @@ export async function PATCH(
         { status: err.statusCode },
       );
     }
+    console.error("[PATCH /api/trip-requests/[id]]", err);
     return NextResponse.json(
       { code: "INTERNAL_ERROR", message: "Error interno." },
       { status: 500 },

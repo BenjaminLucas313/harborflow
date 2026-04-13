@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Ship, ClipboardList, Plus } from "lucide-react";
+import { Ship, ClipboardList, Plus, Send } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { listGroupBookingsByEmployer } from "@/modules/group-bookings/service";
 
@@ -85,6 +85,21 @@ export default async function EmpresaDashboard() {
           </div>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Seguí el estado de las reservas grupales de tu empresa.
+          </p>
+        </Link>
+
+        <Link
+          href="/empresa/solicitudes"
+          className="group flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm transition-all duration-150 hover:shadow-md hover:border-primary/30"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-primary/10 p-2.5 transition-colors group-hover:bg-primary/15">
+              <Send className="size-5 text-primary" aria-hidden="true" />
+            </div>
+            <h2 className="font-semibold">Solicitudes de lancha</h2>
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Pedí una embarcación bajo demanda para traslados específicos.
           </p>
         </Link>
       </nav>

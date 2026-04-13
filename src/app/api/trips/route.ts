@@ -14,6 +14,7 @@ import { TripStatus } from "@prisma/client";
 
 import { auth } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
+import { parseZodError } from "@/lib/zod-errors";
 import { CreateTripSchema } from "@/modules/trips/schema";
 import { createTrip, listTripsByBranch } from "@/modules/trips/service";
 
@@ -114,8 +115,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const parsed = CreateTripSchema.safeParse(body);
   if (!parsed.success) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[POST /api/trips] Zod validation failure", {
+        body,
+        errors: parsed.error.flatten(),
+      });
+    }
     return NextResponse.json(
-      { code: "VALIDATION_ERROR", message: "Invalid request data." },
+      {
+        code: "VALIDATION_ERROR",
+        message: "Datos de solicitud inválidos.",
+        fields: parseZodError(parsed.error),
+      },
       { status: 400 },
     );
   }

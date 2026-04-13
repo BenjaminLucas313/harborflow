@@ -23,6 +23,7 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
   const [waitlist,      setWaitlist]      = useState(true);
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState<string | null>(null);
+  const [fieldErrors,   setFieldErrors]   = useState<Record<string, string>>({});
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,6 +34,7 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
 
     setLoading(true);
     setError(null);
+    setFieldErrors({});
 
     const res = await fetch("/api/trips", {
       method:  "POST",
@@ -52,6 +54,9 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
+      if (body.fields && typeof body.fields === "object") {
+        setFieldErrors(body.fields as Record<string, string>);
+      }
       setError(body.message ?? body.error ?? "Error al crear el viaje.");
       return;
     }
@@ -84,6 +89,7 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
           className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        {fieldErrors.branchId && <p className="text-xs text-red-600">{fieldErrors.branchId}</p>}
       </div>
 
       <div className="space-y-1">
@@ -93,6 +99,7 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
           <option value="">Seleccioná un barco…</option>
           {boats.map((b) => <option key={b.id} value={b.id}>{b.name} (cap. {b.capacity})</option>)}
         </select>
+        {fieldErrors.boatId && <p className="text-xs text-red-600">{fieldErrors.boatId}</p>}
       </div>
 
       <div className="space-y-1">
@@ -102,6 +109,7 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
           <option value="">Sin asignar</option>
           {drivers.map((d) => <option key={d.id} value={d.id}>{d.firstName} {d.lastName}</option>)}
         </select>
+        {fieldErrors.driverId && <p className="text-xs text-red-600">{fieldErrors.driverId}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -109,11 +117,13 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
           <label className="text-sm font-medium">Salida <span className="text-red-500">*</span></label>
           <input type="datetime-local" value={departure} onChange={(e) => setDeparture(e.target.value)}
             className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          {fieldErrors.departureTime && <p className="text-xs text-red-600">{fieldErrors.departureTime}</p>}
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Llegada estimada</label>
           <input type="datetime-local" value={arrival} onChange={(e) => setArrival(e.target.value)}
             className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          {fieldErrors.estimatedArrivalTime && <p className="text-xs text-red-600">{fieldErrors.estimatedArrivalTime}</p>}
         </div>
       </div>
 

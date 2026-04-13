@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
+import { parseZodError } from "@/lib/zod-errors";
 import { assertRole } from "@/lib/permissions";
 import { reviewSlot, getSlotById } from "@/modules/passenger-slots/service";
 import { ReviewSlotSchema } from "@/modules/passenger-slots/schema";
@@ -59,7 +60,7 @@ export async function PATCH(
     const parsed = ReviewSlotSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { code: "VALIDATION_ERROR", message: "Datos inválidos." },
+        { code: "VALIDATION_ERROR", message: "Datos inválidos.", fields: parseZodError(parsed.error) },
         { status: 400 },
       );
     }

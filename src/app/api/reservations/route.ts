@@ -11,6 +11,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
+import { parseZodError } from "@/lib/zod-errors";
 import {
   bookTrip,
   listReservationsByUser,
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = CreateReservationBodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { code: "VALIDATION_ERROR", message: "tripId is required." },
+      { code: "VALIDATION_ERROR", message: "Datos inválidos.", fields: parseZodError(parsed.error) },
       { status: 400 },
     );
   }

@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('PASSENGER', 'OPERATOR', 'ADMIN');
+CREATE TYPE "UserRole" AS ENUM ('PASSENGER', 'OPERATOR', 'ADMIN', 'USUARIO', 'EMPRESA', 'UABL', 'PROVEEDOR');
 
 -- CreateEnum
 CREATE TYPE "TripStatus" AS ENUM ('SCHEDULED', 'BOARDING', 'DELAYED', 'CANCELLED', 'DEPARTED', 'COMPLETED');
@@ -11,10 +11,19 @@ CREATE TYPE "ReservationStatus" AS ENUM ('CONFIRMED', 'WAITLISTED', 'REPLACED', 
 CREATE TYPE "WaitlistStatus" AS ENUM ('WAITING', 'PROMOTED', 'CANCELLED', 'EXPIRED');
 
 -- CreateEnum
+CREATE TYPE "GroupBookingStatus" AS ENUM ('DRAFT', 'SUBMITTED', 'PARTIAL', 'CONFIRMED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "SlotStatus" AS ENUM ('PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED');
+
+-- CreateEnum
 CREATE TYPE "PortStatusValue" AS ENUM ('OPEN', 'PARTIALLY_OPEN', 'CLOSED_WEATHER', 'CLOSED_MAINTENANCE', 'CLOSED_SECURITY', 'CLOSED_OTHER');
 
 -- CreateEnum
-CREATE TYPE "AuditAction" AS ENUM ('RESERVATION_CREATED', 'RESERVATION_REPLACED', 'RESERVATION_CANCELLED', 'RESERVATION_CHECKED_IN', 'RESERVATION_NO_SHOW', 'WAITLIST_JOINED', 'WAITLIST_PROMOTED', 'WAITLIST_CANCELLED', 'WAITLIST_EXPIRED', 'TRIP_CREATED', 'TRIP_STATUS_CHANGED', 'TRIP_CAPACITY_CHANGED', 'PORT_STATUS_CHANGED', 'NOTICE_CREATED', 'NOTICE_DEACTIVATED', 'USER_CREATED', 'USER_ROLE_CHANGED', 'USER_DEACTIVATED');
+CREATE TYPE "AuditAction" AS ENUM ('RESERVATION_CREATED', 'RESERVATION_REPLACED', 'RESERVATION_CANCELLED', 'RESERVATION_CHECKED_IN', 'RESERVATION_NO_SHOW', 'WAITLIST_JOINED', 'WAITLIST_PROMOTED', 'WAITLIST_CANCELLED', 'WAITLIST_EXPIRED', 'TRIP_CREATED', 'TRIP_STATUS_CHANGED', 'TRIP_CAPACITY_CHANGED', 'PORT_STATUS_CHANGED', 'NOTICE_CREATED', 'NOTICE_DEACTIVATED', 'USER_CREATED', 'USER_ROLE_CHANGED', 'USER_DEACTIVATED', 'GROUP_BOOKING_CREATED', 'GROUP_BOOKING_SUBMITTED', 'GROUP_BOOKING_CANCELLED', 'GROUP_BOOKING_SLOT_ADDED', 'SLOT_CONFIRMED', 'SLOT_REJECTED', 'SLOT_CANCELLED', 'SLOT_REVERTED', 'DEPARTMENT_CREATED', 'DEPARTMENT_UPDATED', 'WORKTYPE_CREATED', 'WORKTYPE_UPDATED', 'EMPLOYER_CREATED', 'EMPLOYER_UPDATED', 'TRIP_REQUEST_CREATED', 'TRIP_REQUEST_ACCEPTED', 'TRIP_REQUEST_REJECTED', 'TRIP_REQUEST_CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "TripRequestStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED', 'FULFILLED');
 
 -- CreateTable
 CREATE TABLE "Company" (
@@ -52,12 +61,92 @@ CREATE TABLE "User" (
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
     "phone" TEXT,
-    "role" "UserRole" NOT NULL DEFAULT 'PASSENGER',
+    "role" "UserRole" NOT NULL DEFAULT 'USUARIO',
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "departmentId" TEXT,
+    "employerId" TEXT,
+    "isUablAdmin" BOOLEAN NOT NULL DEFAULT false,
+
+    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Employer" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "taxId" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Employer_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Department" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Department_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "WorkType" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "departmentId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "WorkType_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "GroupBooking" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "branchId" TEXT NOT NULL,
+    "tripId" TEXT NOT NULL,
+    "employerId" TEXT NOT NULL,
+    "bookedById" TEXT NOT NULL,
+    "status" "GroupBookingStatus" NOT NULL DEFAULT 'DRAFT',
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "GroupBooking_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PassengerSlot" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "groupBookingId" TEXT NOT NULL,
+    "tripId" TEXT NOT NULL,
+    "branchId" TEXT NOT NULL,
+    "usuarioId" TEXT NOT NULL,
+    "workTypeId" TEXT NOT NULL,
+    "departmentId" TEXT NOT NULL,
+    "representedCompany" TEXT NOT NULL,
+    "status" "SlotStatus" NOT NULL DEFAULT 'PENDING',
+    "reviewedById" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "rejectionNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PassengerSlot_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -109,6 +198,29 @@ CREATE TABLE "Trip" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Trip_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TripRequest" (
+    "id" TEXT NOT NULL,
+    "companyId" TEXT NOT NULL,
+    "branchId" TEXT,
+    "origin" TEXT NOT NULL,
+    "destination" TEXT NOT NULL,
+    "requestedDate" TIMESTAMP(3) NOT NULL,
+    "passengerCount" INTEGER NOT NULL,
+    "notes" TEXT,
+    "status" "TripRequestStatus" NOT NULL DEFAULT 'PENDING',
+    "requestedById" TEXT NOT NULL,
+    "boatId" TEXT,
+    "tripId" TEXT,
+    "reviewedById" TEXT,
+    "reviewedAt" TIMESTAMP(3),
+    "rejectionNote" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TripRequest_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -215,7 +327,76 @@ CREATE INDEX "User_companyId_role_idx" ON "User"("companyId", "role");
 CREATE INDEX "User_companyId_branchId_idx" ON "User"("companyId", "branchId");
 
 -- CreateIndex
+CREATE INDEX "User_companyId_departmentId_idx" ON "User"("companyId", "departmentId");
+
+-- CreateIndex
+CREATE INDEX "User_companyId_employerId_idx" ON "User"("companyId", "employerId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "User_companyId_email_key" ON "User"("companyId", "email");
+
+-- CreateIndex
+CREATE INDEX "Employer_companyId_idx" ON "Employer"("companyId");
+
+-- CreateIndex
+CREATE INDEX "Employer_companyId_isActive_idx" ON "Employer"("companyId", "isActive");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Employer_companyId_taxId_key" ON "Employer"("companyId", "taxId");
+
+-- CreateIndex
+CREATE INDEX "Department_companyId_idx" ON "Department"("companyId");
+
+-- CreateIndex
+CREATE INDEX "Department_companyId_isActive_idx" ON "Department"("companyId", "isActive");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Department_companyId_name_key" ON "Department"("companyId", "name");
+
+-- CreateIndex
+CREATE INDEX "WorkType_companyId_idx" ON "WorkType"("companyId");
+
+-- CreateIndex
+CREATE INDEX "WorkType_companyId_departmentId_idx" ON "WorkType"("companyId", "departmentId");
+
+-- CreateIndex
+CREATE INDEX "WorkType_companyId_isActive_idx" ON "WorkType"("companyId", "isActive");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "WorkType_companyId_code_key" ON "WorkType"("companyId", "code");
+
+-- CreateIndex
+CREATE INDEX "GroupBooking_companyId_tripId_idx" ON "GroupBooking"("companyId", "tripId");
+
+-- CreateIndex
+CREATE INDEX "GroupBooking_employerId_status_idx" ON "GroupBooking"("employerId", "status");
+
+-- CreateIndex
+CREATE INDEX "GroupBooking_branchId_status_idx" ON "GroupBooking"("branchId", "status");
+
+-- CreateIndex
+CREATE INDEX "GroupBooking_bookedById_idx" ON "GroupBooking"("bookedById");
+
+-- CreateIndex
+CREATE INDEX "PassengerSlot_groupBookingId_idx" ON "PassengerSlot"("groupBookingId");
+
+-- CreateIndex
+CREATE INDEX "PassengerSlot_tripId_status_idx" ON "PassengerSlot"("tripId", "status");
+
+-- CreateIndex
+CREATE INDEX "PassengerSlot_departmentId_status_idx" ON "PassengerSlot"("departmentId", "status");
+
+-- CreateIndex
+CREATE INDEX "PassengerSlot_usuarioId_status_idx" ON "PassengerSlot"("usuarioId", "status");
+
+-- CreateIndex
+CREATE INDEX "PassengerSlot_companyId_tripId_idx" ON "PassengerSlot"("companyId", "tripId");
+
+-- CreateIndex
+CREATE INDEX "PassengerSlot_branchId_status_idx" ON "PassengerSlot"("branchId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PassengerSlot_tripId_usuarioId_key" ON "PassengerSlot"("tripId", "usuarioId");
 
 -- CreateIndex
 CREATE INDEX "Boat_companyId_idx" ON "Boat"("companyId");
@@ -237,6 +418,18 @@ CREATE INDEX "Trip_companyId_departureTime_idx" ON "Trip"("companyId", "departur
 
 -- CreateIndex
 CREATE INDEX "Trip_companyId_status_idx" ON "Trip"("companyId", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TripRequest_tripId_key" ON "TripRequest"("tripId");
+
+-- CreateIndex
+CREATE INDEX "TripRequest_companyId_status_idx" ON "TripRequest"("companyId", "status");
+
+-- CreateIndex
+CREATE INDEX "TripRequest_branchId_status_idx" ON "TripRequest"("branchId", "status");
+
+-- CreateIndex
+CREATE INDEX "TripRequest_requestedById_idx" ON "TripRequest"("requestedById");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Reservation_replacesReservationId_key" ON "Reservation"("replacesReservationId");
@@ -317,6 +510,63 @@ ALTER TABLE "User" ADD CONSTRAINT "User_companyId_fkey" FOREIGN KEY ("companyId"
 ALTER TABLE "User" ADD CONSTRAINT "User_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "Department"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "User" ADD CONSTRAINT "User_employerId_fkey" FOREIGN KEY ("employerId") REFERENCES "Employer"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Employer" ADD CONSTRAINT "Employer_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Department" ADD CONSTRAINT "Department_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WorkType" ADD CONSTRAINT "WorkType_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WorkType" ADD CONSTRAINT "WorkType_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "Department"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GroupBooking" ADD CONSTRAINT "GroupBooking_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GroupBooking" ADD CONSTRAINT "GroupBooking_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GroupBooking" ADD CONSTRAINT "GroupBooking_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "Trip"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GroupBooking" ADD CONSTRAINT "GroupBooking_employerId_fkey" FOREIGN KEY ("employerId") REFERENCES "Employer"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GroupBooking" ADD CONSTRAINT "GroupBooking_bookedById_fkey" FOREIGN KEY ("bookedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PassengerSlot" ADD CONSTRAINT "PassengerSlot_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PassengerSlot" ADD CONSTRAINT "PassengerSlot_groupBookingId_fkey" FOREIGN KEY ("groupBookingId") REFERENCES "GroupBooking"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PassengerSlot" ADD CONSTRAINT "PassengerSlot_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "Trip"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PassengerSlot" ADD CONSTRAINT "PassengerSlot_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PassengerSlot" ADD CONSTRAINT "PassengerSlot_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PassengerSlot" ADD CONSTRAINT "PassengerSlot_workTypeId_fkey" FOREIGN KEY ("workTypeId") REFERENCES "WorkType"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PassengerSlot" ADD CONSTRAINT "PassengerSlot_departmentId_fkey" FOREIGN KEY ("departmentId") REFERENCES "Department"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PassengerSlot" ADD CONSTRAINT "PassengerSlot_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Boat" ADD CONSTRAINT "Boat_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -341,7 +591,28 @@ ALTER TABLE "Trip" ADD CONSTRAINT "Trip_boatId_fkey" FOREIGN KEY ("boatId") REFE
 ALTER TABLE "Trip" ADD CONSTRAINT "Trip_driverId_fkey" FOREIGN KEY ("driverId") REFERENCES "Driver"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "TripRequest" ADD CONSTRAINT "TripRequest_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripRequest" ADD CONSTRAINT "TripRequest_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripRequest" ADD CONSTRAINT "TripRequest_requestedById_fkey" FOREIGN KEY ("requestedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripRequest" ADD CONSTRAINT "TripRequest_boatId_fkey" FOREIGN KEY ("boatId") REFERENCES "Boat"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripRequest" ADD CONSTRAINT "TripRequest_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "Trip"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripRequest" ADD CONSTRAINT "TripRequest_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Reservation" ADD CONSTRAINT "Reservation_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Reservation" ADD CONSTRAINT "Reservation_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Reservation" ADD CONSTRAINT "Reservation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -354,6 +625,9 @@ ALTER TABLE "Reservation" ADD CONSTRAINT "Reservation_replacesReservationId_fkey
 
 -- AddForeignKey
 ALTER TABLE "WaitlistEntry" ADD CONSTRAINT "WaitlistEntry_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WaitlistEntry" ADD CONSTRAINT "WaitlistEntry_branchId_fkey" FOREIGN KEY ("branchId") REFERENCES "Branch"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "WaitlistEntry" ADD CONSTRAINT "WaitlistEntry_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -402,17 +676,3 @@ ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_companyId_fkey" FOREIGN KEY ("co
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- Single active reservation invariant (partial index — cannot be expressed in Prisma schema)
--- Enforces that a user can only hold one active reservation (CONFIRMED, WAITLISTED, CHECKED_IN)
--- at a time within a company. Protects against race conditions at the database level.
-CREATE UNIQUE INDEX reservation_one_active_per_user
-ON "Reservation" ("userId", "companyId")
-WHERE status IN ('CONFIRMED', 'WAITLISTED', 'CHECKED_IN');
-
--- Waitlist deduplication (partial index — cannot be expressed in Prisma schema)
--- Prevents a user from appearing twice in the active queue for the same trip.
--- Partial scope allows rejoining after cancellation (a full unique would block this).
-CREATE UNIQUE INDEX waitlist_one_waiting_per_user_per_trip
-ON "WaitlistEntry" ("userId", "tripId")
-WHERE status = 'WAITING';

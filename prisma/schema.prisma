@@ -170,6 +170,7 @@ enum AuditAction {
   SLOT_CONFIRMED
   SLOT_REJECTED
   SLOT_CANCELLED
+  SLOT_REVERTED
   // ── V2: Admin/configuration operations ───────────────────────────────────
   DEPARTMENT_CREATED
   DEPARTMENT_UPDATED
@@ -177,6 +178,25 @@ enum AuditAction {
   WORKTYPE_UPDATED
   EMPLOYER_CREATED
   EMPLOYER_UPDATED
+  // ── V2: TripRequest lifecycle ─────────────────────────────────────────────
+  TRIP_REQUEST_CREATED
+  TRIP_REQUEST_ACCEPTED
+  TRIP_REQUEST_REJECTED
+  TRIP_REQUEST_CANCELLED
+}
+
+/// Status lifecycle for on-demand boat requests submitted by EMPRESA.
+///
+/// PENDING    → ACCEPTED (PROVEEDOR picks a boat, Trip is auto-created)
+/// PENDING    → REJECTED (PROVEEDOR declines)
+/// PENDING    → CANCELLED (EMPRESA cancels before review)
+/// ACCEPTED   → FULFILLED (Trip successfully created — terminal state)
+enum TripRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  FULFILLED
 }
 
 // =============================================================================
@@ -212,6 +232,7 @@ model Company {
   operationalNotices  OperationalNotice[]
   checkIns            CheckIn[]
   auditLogs           AuditLog[]
+  tripRequests        TripRequest[]
 }
 
 /// Operational location (port / dock / service point) within a company.
@@ -237,6 +258,7 @@ model Branch {
   // V2
   groupBookings      GroupBooking[]
   passengerSlots     PassengerSlot[]
+  tripRequests       TripRequest[]
 
   @@index([companyId])
 }
@@ -296,6 +318,10 @@ model User {
   reviewedSlots      PassengerSlot[]     @relation("SlotReviewer")
   /// GroupBookings created by this EMPRESA user.
   groupBookings      GroupBooking[]      @relation("GroupBookingCreator")
+  /// TripRequests submitted by this EMPRESA user.
+  tripRequestsCreated   TripRequest[]   @relation("TripRequestCreator")
+  /// TripRequests reviewed (accepted/rejected) by this PROVEEDOR user.
+  tripRequestsReviewed  TripRequest[]   @relation("TripRequestReviewer")
 
   @@unique([companyId, email])
   @@index([companyId, role])
@@ -541,6 +567,7 @@ model Boat {
   company Company @relation(fields: [companyId], references: [id])
   branch  Branch  @relation(fields: [branchId], references: [id])
   trips   Trip[]
+  tripRequests TripRequest[]
 
   @@index([companyId])
   @@index([branchId])
@@ -612,10 +639,62 @@ model Trip {
   groupBookings      GroupBooking[]
   passengerSlots     PassengerSlot[]
   operationalNotices OperationalNotice[]
+  /// If this trip was auto-created from a TripRequest on acceptance.
+  tripRequest        TripRequest?
 
   @@index([branchId, departureTime, status])
   @@index([companyId, departureTime])
   @@index([companyId, status])
+}
+
+// =============================================================================
+// TRIPREQUEST — On-demand boat request (EMPRESA → PROVEEDOR)
+// =============================================================================
+
+/// An on-demand boat request submitted by an EMPRESA user.
+/// Represents a "request a boat" flow analogous to a ride-hailing request.
+///
+/// Lifecycle:
+///   EMPRESA submits → PENDING
+///   PROVEEDOR accepts (picks a boat) → Trip auto-created → FULFILLED
+///   PROVEEDOR rejects → REJECTED
+///   EMPRESA cancels before review → CANCELLED
+///
+/// On acceptance, a Trip record is created automatically and tripId is set.
+/// The existing manual trip creation flow is unaffected.
+model TripRequest {
+  id             String            @id @default(cuid())
+  companyId      String
+  /// Optional — solicitudes are not tied to a specific branch. Origin/destination are explicit text fields.
+  branchId       String?
+  origin         String
+  destination    String
+  requestedDate  DateTime
+  passengerCount Int
+  notes          String?
+  status         TripRequestStatus @default(PENDING)
+  requestedById  String
+  /// Set by PROVEEDOR when accepting — which boat will cover this trip.
+  boatId         String?
+  /// Created automatically when PROVEEDOR accepts. Foreign key to the new Trip.
+  tripId         String?           @unique
+  /// PROVEEDOR user who accepted or rejected.
+  reviewedById   String?
+  reviewedAt     DateTime?
+  rejectionNote  String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  requestedBy User     @relation("TripRequestCreator", fields: [requestedById], references: [id])
+  boat        Boat?    @relation(fields: [boatId], references: [id])
+  trip        Trip?    @relation(fields: [tripId], references: [id])
+  reviewedBy  User?    @relation("TripRequestReviewer", fields: [reviewedById], references: [id])
+
+  @@index([companyId, status])
+  @@index([branchId, status])
+  @@index([requestedById])
 }
 
 // =============================================================================

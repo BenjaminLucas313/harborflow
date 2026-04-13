@@ -100,6 +100,77 @@ export async function reviewSlot(
   return updated;
 }
 
+/**
+ * Reverts a CONFIRMED PassengerSlot to CANCELLED, freeing the seat.
+ *
+ * Authorization: the UABL user who originally confirmed the slot,
+ * OR any UABL user with isUablAdmin = true within the same company.
+ *
+ * Throws:
+ *   SLOT_NOT_FOUND (404)       — slot doesn't exist or wrong company
+ *   SLOT_NOT_CONFIRMED (409)   — slot is not in CONFIRMED status
+ *   FORBIDDEN (403)            — caller is neither the reviewer nor UABL admin
+ */
+export async function revertSlot(
+  slotId: string,
+  ctx: {
+    companyId:   string;
+    actorId:     string;
+    isUablAdmin: boolean;
+  },
+): Promise<PassengerSlot> {
+  const slot = await findSlotById(slotId);
+
+  if (!slot || slot.companyId !== ctx.companyId) {
+    throw new AppError("SLOT_NOT_FOUND", "Slot no encontrado.", 404);
+  }
+
+  if (slot.status !== "CONFIRMED") {
+    throw new AppError(
+      "SLOT_NOT_CONFIRMED",
+      "Solo se pueden revertir slots confirmados.",
+      409,
+    );
+  }
+
+  const isReviewer = slot.reviewedById === ctx.actorId;
+  if (!isReviewer && !ctx.isUablAdmin) {
+    throw new AppError(
+      "FORBIDDEN",
+      "No tenés permiso para revertir esta confirmación.",
+      403,
+    );
+  }
+
+  const updated = await prisma.passengerSlot.update({
+    where: { id: slotId },
+    data: {
+      status:       "CANCELLED",
+      reviewedById: null,
+      reviewedAt:   null,
+      rejectionNote: null,
+    },
+  });
+
+  // Recompute parent GroupBooking status.
+  await recomputeGroupBookingStatus(slot.groupBookingId);
+
+  logAction({
+    companyId:  ctx.companyId,
+    actorId:    ctx.actorId,
+    action:     "SLOT_REVERTED",
+    entityType: "PassengerSlot",
+    entityId:   slotId,
+    payload:    {
+      tripId:       slot.tripId,
+      usuarioId:    slot.usuarioId,
+      departmentId: slot.departmentId,
+    },
+  }).catch(() => {});
+
+  return updated;
+}
+
 // ---------------------------------------------------------------------------
 // Queries (exposed for route handlers)
 // ---------------------------------------------------------------------------

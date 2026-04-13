@@ -34,6 +34,7 @@ export type ErrorCode =
   | "SLOT_NOT_FOUND"
   | "SLOT_ALREADY_ASSIGNED"          // USUARIO already on this trip (@@unique violated)
   | "SLOT_NOT_PENDING"               // UABL tried to review an already-reviewed slot
+  | "SLOT_NOT_CONFIRMED"             // UABL tried to revert a slot that is not CONFIRMED
   | "SLOT_FORBIDDEN"                 // Tried to cancel a slot that's not yours
   // ── V2 Authorization ───────────────────────────────────────────────────────
   | "UNAUTHORIZED_DEPARTMENT"        // UABL user's dept doesn't match slot's dept

@@ -1,17 +1,17 @@
-// POST /api/group-bookings — create a GroupBooking in DRAFT status (EMPRESA only)
-// GET  /api/group-bookings?tripId= — list bookings (EMPRESA: own, UABL: by trip)
+// POST /api/trip-requests — EMPRESA submits an on-demand boat request
+// GET  /api/trip-requests — list requests
+//   EMPRESA: own requests (filtered by requestedById)
+//   PROVEEDOR: all requests for their company (optional ?status= filter)
 
 import { NextRequest, NextResponse } from "next/server";
+import { TripRequestStatus } from "@prisma/client";
+
 import { auth } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
 import { parseZodError } from "@/lib/zod-errors";
 import { assertRole } from "@/lib/permissions";
-import {
-  createGroupBooking,
-  listGroupBookingsByEmployer,
-  listGroupBookingsByTrip,
-} from "@/modules/group-bookings/service";
-import { CreateGroupBookingSchema } from "@/modules/group-bookings/schema";
+import { createTripRequest, listTripRequestsByRequester, listTripRequestsByCompany } from "@/modules/trip-requests/service";
+import { CreateTripRequestSchema } from "@/modules/trip-requests/schema";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
@@ -25,15 +25,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     assertRole(session.user.role, ["EMPRESA"]);
 
-    if (!session.user.employerId) {
+    if (!session.user.companyId) {
       return NextResponse.json(
-        { code: "FORBIDDEN", message: "Tu cuenta no tiene empleador asignado." },
-        { status: 403 },
+        { code: "VALIDATION_ERROR", message: "Tu cuenta no tiene una empresa asociada. Cerrá sesión y volvé a ingresar." },
+        { status: 400 },
       );
     }
 
     const body = await req.json();
-    const parsed = CreateGroupBookingSchema.safeParse(body);
+    const parsed = CreateTripRequestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { code: "VALIDATION_ERROR", message: "Datos inválidos.", fields: parseZodError(parsed.error) },
@@ -41,13 +41,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const booking = await createGroupBooking(parsed.data, {
-      companyId:  session.user.companyId,
-      employerId: session.user.employerId,
-      bookedById: session.user.id,
+    const request = await createTripRequest(parsed.data, {
+      companyId:     session.user.companyId,
+      requestedById: session.user.id,
     });
 
-    return NextResponse.json(booking, { status: 201 });
+    return NextResponse.json(request, { status: 201 });
   } catch (err) {
     if (err instanceof AppError) {
       return NextResponse.json(
@@ -55,7 +54,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         { status: err.statusCode },
       );
     }
-    console.error("[POST /api/group-bookings]", err);
+    console.error("[POST /api/trip-requests]", err);
     return NextResponse.json(
       { code: "INTERNAL_ERROR", message: "Error interno." },
       { status: 500 },
@@ -73,31 +72,33 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    assertRole(session.user.role, ["EMPRESA", "UABL"]);
+    assertRole(session.user.role, ["EMPRESA", "PROVEEDOR"]);
 
     const { searchParams } = new URL(req.url);
-    const tripId = searchParams.get("tripId");
 
-    if (session.user.role === "UABL") {
-      if (!tripId) {
+    if (session.user.role === "EMPRESA") {
+      const requests = await listTripRequestsByRequester(
+        session.user.companyId,
+        session.user.id,
+      );
+      return NextResponse.json(requests);
+    }
+
+    // PROVEEDOR: all for their company, optional status filter.
+    const statusParam = searchParams.get("status");
+    let status: TripRequestStatus | undefined;
+    if (statusParam) {
+      if (!(statusParam in TripRequestStatus)) {
         return NextResponse.json(
-          { code: "VALIDATION_ERROR", message: "Se requiere tripId." },
+          { code: "VALIDATION_ERROR", message: `Estado inválido: ${statusParam}` },
           { status: 400 },
         );
       }
-      const bookings = await listGroupBookingsByTrip(session.user.companyId, tripId);
-      return NextResponse.json(bookings);
+      status = statusParam as TripRequestStatus;
     }
 
-    // EMPRESA: own employer's bookings
-    if (!session.user.employerId) {
-      return NextResponse.json([], { status: 200 });
-    }
-    const bookings = await listGroupBookingsByEmployer(
-      session.user.companyId,
-      session.user.employerId,
-    );
-    return NextResponse.json(bookings);
+    const requests = await listTripRequestsByCompany(session.user.companyId, status);
+    return NextResponse.json(requests);
   } catch (err) {
     if (err instanceof AppError) {
       return NextResponse.json(

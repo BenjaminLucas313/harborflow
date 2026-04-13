@@ -3,7 +3,7 @@ import { z } from "zod";
 import { TripStatus } from "@prisma/client";
 
 export const CreateTripSchema = z.object({
-  companyId: z.string(),
+  companyId: z.string().optional(), // always overridden from session server-side
   branchId: z.string(),
   boatId: z.string(),
   driverId: z.string().optional(),

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { RegisterSchema } from "@/modules/auth/schema";
 import { registerPassenger } from "@/modules/auth/service";
 import { AppError } from "@/lib/errors";
+import { parseZodError } from "@/lib/zod-errors";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = RegisterSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { code: "VALIDATION_ERROR", message: "Invalid request data." },
+      { code: "VALIDATION_ERROR", message: "Datos inválidos.", fields: parseZodError(parsed.error) },
       { status: 400 },
     );
   }

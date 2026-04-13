@@ -9,6 +9,7 @@ import { PortStatusValue } from "@prisma/client";
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { parseZodError } from "@/lib/zod-errors";
 import { logAction } from "@/modules/audit/repository";
 
 const BodySchema = z.object({
@@ -36,7 +37,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
+    return NextResponse.json(
+      { code: "VALIDATION_ERROR", message: "Datos inválidos.", fields: parseZodError(parsed.error) },
+      { status: 400 },
+    );
   }
 
   const { branchId, status, message } = parsed.data;

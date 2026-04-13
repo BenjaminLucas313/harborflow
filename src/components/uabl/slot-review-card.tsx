@@ -1,10 +1,10 @@
 "use client";
 
-// SlotReviewCard — UABL component to confirm or reject a PassengerSlot.
-// Shows passenger name, work type, and action buttons (confirm / reject with note).
+// SlotReviewCard — UABL component to confirm, reject, or revert a PassengerSlot.
+// Shows passenger name, work type, and action buttons.
 
 import { useState } from "react";
-import { CheckCircle2, XCircle, Clock, ChevronDown } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, ChevronDown, RotateCcw } from "lucide-react";
 import type { SlotWithRelations } from "@/modules/passenger-slots/repository";
 
 type Props = {
@@ -12,13 +12,15 @@ type Props = {
 };
 
 export function SlotReviewCard({ slot }: Props) {
-  const [rejectionNote, setRejectionNote] = useState("");
-  const [showReject, setShowReject]       = useState(false);
-  const [loading, setLoading]             = useState<"confirm" | "reject" | null>(null);
-  const [result, setResult]               = useState<"confirmed" | "rejected" | null>(null);
-  const [error, setError]                 = useState<string | null>(null);
+  const [rejectionNote,  setRejectionNote]  = useState("");
+  const [showReject,     setShowReject]     = useState(false);
+  const [showRevert,     setShowRevert]     = useState(false);
+  const [loading,        setLoading]        = useState<"confirm" | "reject" | "revert" | null>(null);
+  const [result,         setResult]         = useState<"confirmed" | "rejected" | "reverted" | null>(null);
+  const [error,          setError]          = useState<string | null>(null);
 
-  const isPending = slot.status === "PENDING" && !result;
+  const isPending   = slot.status === "PENDING"   && !result;
+  const isConfirmed = slot.status === "CONFIRMED" && !result;
 
   async function handleReview(action: "CONFIRM" | "REJECT") {
     if (action === "REJECT" && !rejectionNote.trim()) {
@@ -46,13 +48,37 @@ export function SlotReviewCard({ slot }: Props) {
     setShowReject(false);
   }
 
+  async function handleRevert() {
+    setLoading("revert");
+    setError(null);
+
+    const res = await fetch(`/api/slots/${slot.id}/revert`, {
+      method: "POST",
+    });
+
+    setLoading(null);
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.message ?? body.error ?? "Error al revertir la confirmación.");
+      return;
+    }
+
+    setResult("reverted");
+    setShowRevert(false);
+  }
+
   const statusLabel =
     result === "confirmed"  ? "Confirmado"
     : result === "rejected" ? "Rechazado"
+    : result === "reverted" ? "Revertido"
     : slot.status === "CONFIRMED" ? "Confirmado"
     : slot.status === "REJECTED"  ? "Rechazado"
     : slot.status === "CANCELLED" ? "Cancelado"
     : null;
+
+  const isResultConfirmed = result === "confirmed" || (slot.status === "CONFIRMED" && !result);
+  const isResultRejected  = result === "rejected"  || (slot.status === "REJECTED"  && !result);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
@@ -77,15 +103,19 @@ export function SlotReviewCard({ slot }: Props) {
         {!isPending && statusLabel && (
           <span
             className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${
-              (result ?? slot.status) === "confirmed" || slot.status === "CONFIRMED"
+              isResultConfirmed && result !== "reverted"
                 ? "bg-emerald-100 text-emerald-700"
-                : (result ?? slot.status) === "rejected" || slot.status === "REJECTED"
+                : isResultRejected
                 ? "bg-red-100 text-red-700"
+                : result === "reverted"
+                ? "bg-amber-100 text-amber-700"
                 : "bg-slate-100 text-slate-600"
             }`}
           >
-            {(result ?? slot.status) === "confirmed" || slot.status === "CONFIRMED"
+            {isResultConfirmed && result !== "reverted"
               ? <CheckCircle2 className="size-3" />
+              : result === "reverted"
+              ? <RotateCcw className="size-3" />
               : <XCircle className="size-3" />}
             {statusLabel}
           </span>
@@ -115,7 +145,7 @@ export function SlotReviewCard({ slot }: Props) {
         </p>
       )}
 
-      {/* Actions — only for pending slots */}
+      {/* Actions — only for PENDING slots */}
       {isPending && (
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -161,6 +191,48 @@ export function SlotReviewCard({ slot }: Props) {
               >
                 {loading === "reject" ? "Rechazando…" : "Confirmar rechazo"}
               </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Revert action — only for CONFIRMED slots */}
+      {isConfirmed && (
+        <div className="space-y-2 pt-1 border-t border-border">
+          <button
+            onClick={() => setShowRevert((v) => !v)}
+            disabled={!!loading}
+            className="flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-800 disabled:opacity-50 transition-colors"
+          >
+            <RotateCcw className="size-3.5" />
+            Revertir confirmación
+            <ChevronDown
+              className={`size-3 transition-transform ${showRevert ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {showRevert && (
+            <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs text-amber-800">
+                Esto cancelará el lugar reservado para esta persona. La acción queda registrada en el historial.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRevert}
+                  disabled={!!loading}
+                  className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                >
+                  <RotateCcw className="size-4" />
+                  {loading === "revert" ? "Revirtiendo…" : "Confirmar reversión"}
+                </button>
+                <button
+                  onClick={() => setShowRevert(false)}
+                  disabled={!!loading}
+                  className="rounded-xl border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -490,6 +490,63 @@ async function main() {
     console.log(`✓ GroupBooking: already exists (id: ${groupBooking.id})`);
   }
 
+  // ── 11. Sample TripRequests ───────────────────────────────────────────────
+  // One PENDING request from each EMPRESA user — exercises the on-demand
+  // boat request flow and lets PROVEEDOR review them immediately.
+
+  console.log("");
+  const empresaServiceUser = createdUsers["empresa.servicios"]!;
+
+  // Request 1 — Constructora Norte, PENDING (not yet reviewed)
+  const existingReq1 = await prisma.tripRequest.findFirst({
+    where: {
+      companyId:     company.id,
+      requestedById: empresaConstructora.id,
+      origin:        "Terminal Norte",
+    },
+  });
+  if (!existingReq1) {
+    await prisma.tripRequest.create({
+      data: {
+        company:        { connect: { id: company.id } },
+        origin:         "Terminal Norte",
+        destination:    "Dársena Sur",
+        requestedDate:  futureDate(3, 7, 30),
+        passengerCount: 4,
+        notes:          "Cuadrilla de carga — turno madrugada",
+        requestedBy:    { connect: { id: empresaConstructora.id } },
+      },
+    });
+    console.log(`✓ TripRequest 1: Constructora Norte → Terminal Norte→Dársena Sur (PENDING)`);
+  } else {
+    console.log(`✓ TripRequest 1: already exists`);
+  }
+
+  // Request 2 — Servicios Portuarios, PENDING
+  const existingReq2 = await prisma.tripRequest.findFirst({
+    where: {
+      companyId:     company.id,
+      requestedById: empresaServiceUser.id,
+      origin:        "Muelle Central",
+    },
+  });
+  if (!existingReq2) {
+    await prisma.tripRequest.create({
+      data: {
+        company:        { connect: { id: company.id } },
+        origin:         "Muelle Central",
+        destination:    "Zona Franca",
+        requestedDate:  futureDate(4, 9, 0),
+        passengerCount: 2,
+        notes:          "Inspección programada",
+        requestedBy:    { connect: { id: empresaServiceUser.id } },
+      },
+    });
+    console.log(`✓ TripRequest 2: Servicios Portuarios → Muelle Central→Zona Franca (PENDING)`);
+  } else {
+    console.log(`✓ TripRequest 2: already exists`);
+  }
+
   // ── Summary ──────────────────────────────────────────────────────────────
   console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -518,13 +575,19 @@ async function main() {
    Slot 1: Juan Pérez    — CARGA    → pending Operaciones review
    Slot 2: María García  — MANT_EL  → pending Mantenimiento review
 
+ Preloaded: 2 PENDING TripRequests
+   Req 1: Constructora Norte  — Terminal Norte → Dársena Sur (4 pasajeros)
+   Req 2: Servicios Portuarios — Muelle Central → Zona Franca (2 pasajeros)
+
  TESTING CHECKLIST
  ─────────────────
  □ Log in as uabl.operaciones   → see pending slot for Juan Pérez
  □ Log in as uabl.mantenimiento → see pending slot for María García
  □ Confirm/reject a slot        → GroupBooking status recalculates
- □ Log in as empresa@constructora → see GroupBooking detail + slot statuses
- □ Log in as proveedor          → see trips, change status, update puerto
+ □ Log in as empresa@constructora → see GroupBooking + 1 TripRequest pending
+ □ Log in as empresa@servicios   → see 1 TripRequest pending
+ □ Log in as proveedor          → see trips, 2 TripRequests to review
+ □ Proveedor acepta TripRequest → Trip se crea automáticamente
  □ Log in as uabl.admin         → manage departamentos + tipos de trabajo
  □ Log in as juan.perez         → see Trip 1 as assigned (read-only)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { AppError } from "@/lib/errors";
+import { parseZodError } from "@/lib/zod-errors";
 import { assertRole } from "@/lib/permissions";
 import { addSlotToBooking } from "@/modules/group-bookings/service";
 import { listSlotsByTrip } from "@/modules/passenger-slots/service";
@@ -36,7 +37,7 @@ export async function POST(
     const parsed = AddSlotSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { code: "VALIDATION_ERROR", message: "Datos inválidos." },
+        { code: "VALIDATION_ERROR", message: "Datos inválidos.", fields: parseZodError(parsed.error) },
         { status: 400 },
       );
     }

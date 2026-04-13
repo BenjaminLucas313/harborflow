@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Ship, MapPin, Clock, Anchor } from "lucide-react";
+import { Ship, MapPin, Clock, Anchor, Send } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -134,11 +134,12 @@ export default async function ProveedorDashboard() {
       </div>
 
       {/* Navigation */}
-      <nav className="grid gap-4 sm:grid-cols-3">
+      <nav className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { href: "/proveedor/barcos",  icon: Ship,   label: "Barcos",  desc: "Gestionar la flota y capacidades." },
-          { href: "/proveedor/viajes",  icon: Anchor, label: "Viajes",  desc: "Crear y editar viajes programados." },
-          { href: "/proveedor/puerto",  icon: MapPin, label: "Puerto",  desc: "Abrir, cerrar y comunicar el estado." },
+          { href: "/proveedor/barcos",      icon: Ship,   label: "Barcos",      desc: "Gestionar la flota y capacidades." },
+          { href: "/proveedor/viajes",      icon: Anchor, label: "Viajes",      desc: "Crear y editar viajes programados." },
+          { href: "/proveedor/puerto",      icon: MapPin, label: "Puerto",      desc: "Abrir, cerrar y comunicar el estado." },
+          { href: "/proveedor/solicitudes", icon: Send,   label: "Solicitudes", desc: "Revisar pedidos de lancha bajo demanda." },
         ].map(({ href, icon: Icon, label, desc }) => (
           <Link
             key={href}
