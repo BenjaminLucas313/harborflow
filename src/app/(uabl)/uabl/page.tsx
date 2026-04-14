@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Ship, BarChart3, Settings } from "lucide-react";
+import { Anchor, Ship, BarChart3, Settings, ChevronRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -59,6 +59,63 @@ export default async function UablDashboard() {
       )}
 
       <nav aria-label="Secciones" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* ── UABL Assistant — CTA destacado, ocupa el ancho completo ── */}
+        <Link
+          href="/uabl/assistant"
+          className="col-span-full group flex items-center justify-between rounded-2xl p-5 sm:p-6 shadow-sm transition-all duration-200 hover:shadow-lg hover:scale-[1.005]"
+          style={{
+            background: "linear-gradient(135deg, #0a1628 0%, #0d1b35 55%, #12243d 100%)",
+            border:     "1px solid rgba(96,165,250,0.2)",
+          }}
+          aria-label="Abrir UABL Assistant"
+        >
+          <div className="flex items-center gap-4">
+            {/* Icon */}
+            <div
+              className="shrink-0 rounded-xl p-3"
+              style={{ background: "rgba(37,99,189,0.2)", border: "1px solid rgba(96,165,250,0.2)" }}
+            >
+              <Anchor className="size-6" style={{ color: "#60a5fa" }} aria-hidden="true" />
+            </div>
+
+            {/* Text */}
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <h2 className="font-bold text-base" style={{ color: "#f0f6ff" }}>
+                  UABL Assistant
+                </h2>
+                {/* Live indicator */}
+                <span
+                  className="flex items-center gap-1 text-xs font-medium"
+                  style={{ color: "#34d399" }}
+                >
+                  <span
+                    style={{
+                      width:           6,
+                      height:          6,
+                      borderRadius:    "50%",
+                      backgroundColor: "#34d399",
+                      display:         "inline-block",
+                    }}
+                    aria-hidden="true"
+                  />
+                  En línea
+                </span>
+              </div>
+              <p className="text-sm" style={{ color: "#4d72a8" }}>
+                Consultá datos en tiempo real · Recomendaciones de eficiencia con IA
+              </p>
+            </div>
+          </div>
+
+          {/* Chevron */}
+          <ChevronRight
+            className="size-5 shrink-0 transition-transform duration-200 group-hover:translate-x-1"
+            style={{ color: "#4d72a8" }}
+            aria-hidden="true"
+          />
+        </Link>
+        {/* ──────────────────────────────────────────────────────────── */}
         <Link
           href="/uabl/viajes"
           className="group flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 shadow-sm transition-all duration-150 hover:shadow-md hover:border-primary/30"

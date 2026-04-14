@@ -30,6 +30,7 @@ export default async function UablLayout({
         role="UABL"
         companyName={company?.name}
         homeHref="/uabl"
+        assistantHref="/uabl/assistant"
       />
       <PortBannerSsr companyId={companyId} />
       {children}

@@ -54,6 +54,11 @@ type Props = {
   companyName?: string;
   /** The home link for this role (clicking the brand navigates here). */
   homeHref: string;
+  /**
+   * When provided, renders an AI Assistant CTA button in the nav bar.
+   * Only passed by the UABL layout — other roles don't see this.
+   */
+  assistantHref?: string;
 };
 
 export function AppNav({
@@ -62,6 +67,7 @@ export function AppNav({
   role,
   companyName,
   homeHref,
+  assistantHref,
 }: Props) {
   const badge = ROLE_BADGE[role];
 
@@ -76,6 +82,39 @@ export function AppNav({
           <Anchor className="size-5" aria-hidden="true" />
           <span className="hidden sm:block tracking-tight">HarborFlow</span>
         </Link>
+
+        {/* UABL Assistant CTA — only rendered when assistantHref is provided */}
+        {assistantHref && (
+          <Link
+            href={assistantHref}
+            className="assistant-cta-btn flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-sm font-semibold shadow-sm transition-opacity hover:opacity-85"
+            style={{
+              background:     "linear-gradient(135deg, #0d1b35 0%, #1e3a5f 100%)",
+              border:         "1px solid rgba(96,165,250,0.25)",
+              textDecoration: "none",
+            }}
+            aria-label="Abrir UABL Assistant"
+          >
+            <Anchor
+              className="size-4 shrink-0"
+              style={{ color: "#60a5fa" }}
+              aria-hidden="true"
+            />
+            {/* "Assistant" on desktop, "AI" on mobile */}
+            <span className="hidden sm:block tracking-[0.01em]" style={{ color: "#f0f6ff" }}>
+              Assistant
+            </span>
+            <span className="sm:hidden" style={{ color: "#f0f6ff" }}>
+              AI
+            </span>
+            {/* Live dot */}
+            <span
+              className="size-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: "#34d399" }}
+              aria-hidden="true"
+            />
+          </Link>
+        )}
 
         {/* Right side: user info + role badge + logout */}
         <div className="flex items-center gap-3 min-w-0">
