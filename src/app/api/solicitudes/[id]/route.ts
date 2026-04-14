@@ -39,7 +39,7 @@ import { cancelTripRequestByOwner } from "@/modules/trip-requests/service";
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: RouteParams,
 ): Promise<NextResponse> {
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -63,11 +63,23 @@ export async function DELETE(
   // ── Cancel ────────────────────────────────────────────────────────────────
   const { id } = await params;
 
+  // Optional body: { motivoCancelacion?: string }
+  let motivoCancelacion: string | undefined;
+  try {
+    const body = await req.json().catch(() => ({})) as { motivoCancelacion?: unknown };
+    if (typeof body.motivoCancelacion === "string" && body.motivoCancelacion.trim()) {
+      motivoCancelacion = body.motivoCancelacion.trim().slice(0, 500);
+    }
+  } catch {
+    // no body — fine, field is optional
+  }
+
   try {
     const data = await cancelTripRequestByOwner(
       id,
       session.user.id,
       session.user.companyId,
+      motivoCancelacion,
     );
     return NextResponse.json({ data });
   } catch (err) {

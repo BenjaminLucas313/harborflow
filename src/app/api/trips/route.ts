@@ -4,7 +4,7 @@
 //     date      string   optional  YYYY-MM-DD — filters to that calendar day (UTC)
 //     status    string   optional  TripStatus enum value — overrides the default non-terminal filter
 //
-// POST /api/trips — create a trip (ADMIN only)
+// POST /api/trips — create a trip (PROVEEDOR only)
 //   Body: CreateTripSchema fields (companyId is ignored from body — taken from session)
 //
 // Business logic lives in modules/trips/service.ts.
@@ -81,11 +81,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 }
 
 // ---------------------------------------------------------------------------
-// POST — create a trip (ADMIN only)
+// POST — create a trip (PROVEEDOR only)
 // ---------------------------------------------------------------------------
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  // 1. Require an authenticated ADMIN session.
+  // 1. Require an authenticated PROVEEDOR session.
   const session = await auth();
 
   if (!session) {
@@ -95,9 +95,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  if (session.user.role !== "ADMIN" && session.user.role !== "PROVEEDOR") {
+  if (session.user.role !== "PROVEEDOR") {
     return NextResponse.json(
-      { code: "FORBIDDEN", message: "Only PROVEEDOR or administrators can create trips." },
+      { code: "FORBIDDEN", message: "Only PROVEEDOR can create trips." },
       { status: 403 },
     );
   }

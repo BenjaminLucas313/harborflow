@@ -42,33 +42,29 @@ The product is not a toy project. It must be architected with professional engin
 
 ## Roles and Capabilities
 
-### Passenger
-- Register and authenticate
-- Browse future trips
-- View trip details
-- Create reservation
-- Replace active reservation
-- View active reservation status
-- Join waitlist when a trip is full
-- Receive reservation and disruption notices
+### USUARIO (individual worker / inspector)
+- View trips they have been assigned to via PassengerSlots
+- Cannot self-book; they are added to bookings by EMPRESA
 
-### Operator
-- Manage operational trip state
-- Perform passenger check-in
-- Mark embarkation progress
-- View manifest and occupancy
-- Open / close the port
+### EMPRESA (company coordinator)
+- Create and manage GroupBookings for their employees
+- Add/remove PassengerSlots before submission
+- Submit GroupBookings to UABL for review
+- Cancel their own GroupBookings
+
+### UABL (port authority)
+- Approve or reject PassengerSlots by department
+- Manage departments and work types (isUablAdmin sub-role)
+- Access operational metrics, liquidation reports, and PDF exports
+- View trip manifests and ficha de viaje PDFs
+- Access the AI assistant for operational insights
+
+### PROVEEDOR (boat operator)
+- Manage fleet (boats, drivers)
+- Create and manage trips
+- Manage port status (open / close / partial)
 - Publish operational notices
-- Trigger trip-specific or port-wide disruption handling
-
-### Administrator
-- Full CRUD on companies, branches, boats, drivers, trips, schedules, and users
-- Full reservation oversight
-- Waitlist and disruption oversight
-- Analytics access
-- Policy configuration
-- Role management
-- Audit visibility
+- View trip manifests and ficha de viaje PDFs
 
 ## Core Domain Concepts
 

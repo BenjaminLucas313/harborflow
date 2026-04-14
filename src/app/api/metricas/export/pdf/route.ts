@@ -8,7 +8,7 @@
 //   anio          — 2020–2100 (default: current Argentina year)
 //   departamentoId — optional; filter to one department
 //
-// Auth: ADMIN or UABL roles.
+// Auth: UABL only.
 //
 // Response:
 //   200  application/pdf — attachment
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    assertRole(session.user.role, ["ADMIN", "UABL"]);
+    assertRole(session.user.role, ["UABL"]);
 
     const { searchParams }                 = new URL(req.url);
     const { mes: defaultMes, anio: defaultAnio } = argNow();

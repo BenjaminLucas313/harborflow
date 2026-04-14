@@ -46,19 +46,23 @@ datasource db {
 // ENUMS
 // =============================================================================
 
-/// V2 role model. Old values (PASSENGER, OPERATOR, ADMIN) are kept for
-/// migration safety and will be removed in a future cleanup migration.
+/// Active role model (V2). Legacy values are kept in the enum only because
+/// they may still exist in the database — they must never be assigned to
+/// new users and are not reachable through any UI or API.
 ///
 /// USUARIO   : individual worker/inspector — can only view their assigned trips
 /// EMPRESA   : company coordinator — creates GroupBookings for their employees
 /// UABL      : port authority reviewer — approves/rejects PassengerSlots by dept
 /// PROVEEDOR : boat operator — manages fleet, trips, and port status
 enum UserRole {
-  // ── V1 legacy values (deprecated — do not assign to new users) ──
+  // ── DEPRECATED — do not use. May still exist in DB rows from V1.
+  // ── The middleware redirects these to /login. No UI or API accepts them.
+  // ── Safe to DROP in a future migration once all rows are migrated.
   PASSENGER
   OPERATOR
   ADMIN
-  // ── V2 values ────────────────────────────────────────────────────
+
+  // ── V2 active values ──────────────────────────────────────────────
   USUARIO
   EMPRESA
   UABL
@@ -272,6 +276,7 @@ model Company {
   tripRequests        TripRequest[]
   asientosLiquidacion AsientoLiquidacion[]
   recomendacionesIA   RecomendacionIA[]
+  snapshotsMensuales  SnapshotMensual[]
 }
 
 /// Operational location (port / dock / service point) within a company.
@@ -740,9 +745,11 @@ model TripRequest {
   /// PROVEEDOR user who accepted or rejected.
   reviewedById   String?
   reviewedAt     DateTime?
-  rejectionNote  String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  rejectionNote        String?
+  /// Optional reason provided by the EMPRESA user when self-cancelling.
+  motivoCancelacion    String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   company     Company  @relation(fields: [companyId], references: [id])
   branch      Branch?  @relation(fields: [branchId], references: [id])
@@ -1053,6 +1060,43 @@ model AuditLog {
   @@index([companyId, action, createdAt(sort: Desc)])
   @@index([actorId, createdAt(sort: Desc)])
   @@index([companyId, createdAt(sort: Desc)])
+}
+
+// =============================================================================
+// SNAPSHOT MENSUAL
+// =============================================================================
+
+/// Immutable monthly aggregate snapshot for period comparison and AI analysis.
+/// One record per company per calendar month. Idempotent: re-running the job
+/// overwrites the record and resets generadoEn.
+///
+/// Fields:
+///   distribucionDeptos  — { [deptName]: totalSlots }  (PENDING + CONFIRMED)
+///   viajesPorDia        — { [YYYY-MM-DD]: { viajes, ocupacion } }
+///   promedioOcupacion   — ratio 0.0–1.0 (mean of per-trip occupied/capacity)
+///   cancelaciones       — trips with viajeStatus = CANCELADO
+///   viajesBajaOcupacion — non-cancelled trips with occupancy ratio < 0.40
+model SnapshotMensual {
+  id                    String   @id @default(cuid())
+  companyId             String
+  branchId              String?
+  mes                   Int
+  anio                  Int
+  totalViajes           Int
+  totalAsientosOcupados Decimal  @db.Decimal(10, 2)
+  totalAsientosVacios   Decimal  @db.Decimal(10, 2)
+  promedioOcupacion     Decimal  @db.Decimal(5, 4)
+  distribucionDeptos    Json
+  viajesPorDia          Json
+  cancelaciones         Int
+  viajesBajaOcupacion   Int
+  generadoEn            DateTime @default(now())
+  cerrado               Boolean  @default(true)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, mes, anio])
+  @@index([companyId, anio, mes])
 }
 
 // =============================================================================

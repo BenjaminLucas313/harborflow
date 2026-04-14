@@ -16,8 +16,9 @@ import type { CreateTripInput } from "./schema";
 // Create
 // ---------------------------------------------------------------------------
 
-export type CreateTripServiceInput = CreateTripInput & {
-  /** ID of the ADMIN performing the action, written to the audit log. */
+export type CreateTripServiceInput = Omit<CreateTripInput, "companyId"> & {
+  /** companyId is required at the service layer — always set from session, never from the client. */
+  companyId: string;
   actorId: string;
 };
 

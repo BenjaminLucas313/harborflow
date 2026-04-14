@@ -6,23 +6,24 @@ import type { TripRequest, TripRequestStatus } from "@prisma/client";
 // ---------------------------------------------------------------------------
 
 const tripRequestSelect = {
-  id:             true,
-  companyId:      true,
-  branchId:       true,
-  origin:         true,
-  destination:    true,
-  requestedDate:  true,
-  passengerCount: true,
-  notes:          true,
-  status:         true,
-  requestedById:  true,
-  boatId:         true,
-  tripId:         true,
-  reviewedById:   true,
-  reviewedAt:     true,
-  rejectionNote:  true,
-  createdAt:      true,
-  updatedAt:      true,
+  id:                   true,
+  companyId:            true,
+  branchId:             true,
+  origin:               true,
+  destination:          true,
+  requestedDate:        true,
+  passengerCount:       true,
+  notes:                true,
+  status:               true,
+  requestedById:        true,
+  boatId:               true,
+  tripId:               true,
+  reviewedById:         true,
+  reviewedAt:           true,
+  rejectionNote:        true,
+  motivoCancelacion:    true,
+  createdAt:            true,
+  updatedAt:            true,
   requestedBy: {
     select: { id: true, firstName: true, lastName: true, email: true },
   },
@@ -74,12 +75,13 @@ export async function createTripRequest(
 export async function updateTripRequest(
   id: string,
   data: Partial<{
-    status:        TripRequestStatus;
-    boatId:        string;
-    tripId:        string;
-    reviewedById:  string;
-    reviewedAt:    Date;
-    rejectionNote: string;
+    status:             TripRequestStatus;
+    boatId:             string;
+    tripId:             string;
+    reviewedById:       string;
+    reviewedAt:         Date;
+    rejectionNote:      string;
+    motivoCancelacion:  string;
   }>,
 ): Promise<TripRequestWithRelations> {
   return prisma.tripRequest.update({

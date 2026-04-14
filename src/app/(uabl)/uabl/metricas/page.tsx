@@ -11,7 +11,8 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { UablMetricasDashboard } from "@/components/uabl/UablMetricasDashboard";
+import { UablMetricasDashboard }  from "@/components/uabl/UablMetricasDashboard";
+import { SnapshotComparativo }    from "@/components/uabl/SnapshotComparativo";
 
 /** Argentina current month/year (UTC-3, no DST). */
 function argNow(): { mes: number; anio: number } {
@@ -61,6 +62,10 @@ export default async function MetricasPage() {
         defaultAnio={anio}
         defaultBranchId={defaultBranchId}
       />
+
+      <hr className="border-border" />
+
+      <SnapshotComparativo />
     </main>
   );
 }

@@ -5,7 +5,7 @@
 //   anio         (optional, default = current Argentina year)
 //   departamentoId (optional, filter to a single department)
 //
-// Auth: ADMIN only
+// Auth: UABL only
 // Response: { data: AdminMetrics }
 
 import { NextRequest, NextResponse } from "next/server";
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const session = await auth();
     if (!session) return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "No autorizado." } }, { status: 401 });
 
-    assertRole(session.user.role, ["ADMIN", "UABL"]);
+    assertRole(session.user.role, ["UABL"]);
 
     const { searchParams } = new URL(req.url);
     const { mes: defaultMes, anio: defaultAnio } = argNow();

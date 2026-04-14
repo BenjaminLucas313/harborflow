@@ -2,7 +2,7 @@
 //
 // Generates and returns the "Ficha de Viaje" PDF for a completed trip.
 //
-// Auth: UABL, ADMIN, or OPERATOR roles only.
+// Auth: UABL or PROVEEDOR roles only.
 // Eligibility: trip must have viajeStatus = PASADO (DEPARTED or COMPLETED).
 //
 // Response:
@@ -43,7 +43,7 @@ export async function GET(
       );
     }
 
-    assertRole(session.user.role, ["ADMIN", "UABL", "OPERATOR"]);
+    assertRole(session.user.role, ["UABL", "PROVEEDOR"]);
 
     const { id: tripId } = await params;
     const { companyId }  = session.user;

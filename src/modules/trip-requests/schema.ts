@@ -3,9 +3,9 @@ import { z } from "zod";
 export const CreateTripRequestSchema = z.object({
   origin:         z.string().min(1, "El origen es obligatorio.").max(200).trim(),
   destination:    z.string().min(1, "El destino es obligatorio.").max(200).trim(),
-  requestedDate:  z.coerce.date({ required_error: "La fecha es obligatoria." }),
+  requestedDate:  z.coerce.date({ error: "La fecha es obligatoria." }),
   passengerCount: z
-    .number({ required_error: "La cantidad de personas es obligatoria." })
+    .number({ error: "La cantidad de personas es obligatoria." })
     .int()
     .min(1, "Debe haber al menos 1 persona.")
     .max(500, "El límite es 500 personas."),

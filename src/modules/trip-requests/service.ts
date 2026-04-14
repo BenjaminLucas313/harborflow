@@ -239,9 +239,10 @@ export async function reviewTripRequest(
  *   CANCELLATION_TOO_LATE (422)          — within 2h or past departure
  */
 export async function cancelTripRequestByOwner(
-  requestId: string,
-  actorId:   string,
-  companyId: string,
+  requestId:          string,
+  actorId:            string,
+  companyId:          string,
+  motivoCancelacion?: string,
 ): Promise<TripRequestWithRelations> {
   // 1. Fetch with ownership check.
   const request = await findTripRequestById(requestId, companyId);
@@ -290,7 +291,10 @@ export async function cancelTripRequestByOwner(
     // 6a. Cancel the TripRequest.
     await tx.tripRequest.update({
       where: { id: requestId },
-      data:  { status: "CANCELLED" },
+      data:  {
+        status: "CANCELLED",
+        ...(motivoCancelacion ? { motivoCancelacion } : {}),
+      },
     });
 
     // 6b. If the request was already FULFILLED, cancel all GroupBookings
@@ -329,7 +333,11 @@ export async function cancelTripRequestByOwner(
     action:     "TRIP_REQUEST_CANCELLED",
     entityType: "TripRequest",
     entityId:   requestId,
-    payload:    { status: request.status, tripId: request.tripId ?? null },
+    payload:    {
+      status:             request.status,
+      tripId:             request.tripId ?? null,
+      motivoCancelacion:  motivoCancelacion ?? null,
+    },
   }).catch(() => {});
 
   // Return fresh record to reflect new CANCELLED status.

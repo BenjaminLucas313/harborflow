@@ -103,7 +103,7 @@ export function SlotReviewCard({ slot }: Props) {
         {!isPending && statusLabel && (
           <span
             className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${
-              isResultConfirmed && result !== "reverted"
+              isResultConfirmed
                 ? "bg-emerald-100 text-emerald-700"
                 : isResultRejected
                 ? "bg-red-100 text-red-700"
@@ -112,7 +112,7 @@ export function SlotReviewCard({ slot }: Props) {
                 : "bg-slate-100 text-slate-600"
             }`}
           >
-            {isResultConfirmed && result !== "reverted"
+            {isResultConfirmed
               ? <CheckCircle2 className="size-3" />
               : result === "reverted"
               ? <RotateCcw className="size-3" />

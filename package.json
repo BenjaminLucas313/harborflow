@@ -10,7 +10,8 @@
     "db:mark-past-dry": "cross-env DRY_RUN=true tsx prisma/scripts/mark-past-trips.ts",
     "db:mark-past": "cross-env DRY_RUN=false tsx prisma/scripts/mark-past-trips.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "snapshot:generar": "cross-env MES=anterior tsx --env-file=.env src/scripts/generar-snapshot.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
