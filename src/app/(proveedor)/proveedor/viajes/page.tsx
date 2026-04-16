@@ -1,62 +1,72 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { Plus } from "lucide-react";
-import { ViajesGrouped } from "@/components/proveedor/viajes-grouped";
-import type { TripItem } from "@/components/proveedor/viajes-grouped";
+import { redirect }    from "next/navigation";
+import Link            from "next/link";
+import { auth }        from "@/lib/auth";
+import { prisma }      from "@/lib/prisma";
+import { SlotStatus }  from "@prisma/client";
+import { Plus }        from "lucide-react";
+import { ViajesGrouped }  from "@/components/proveedor/viajes-grouped";
+import type { TripItem }  from "@/components/proveedor/viajes-grouped";
+
+// Statuses that count as an occupied seat.
+const ACTIVE_SLOT_STATUSES: SlotStatus[] = ["PENDING", "CONFIRMED"];
 
 export default async function ProveedorViajes() {
   const session = await auth();
   if (!session) redirect("/login");
 
   const now = new Date();
+  // 30-day windows keep queries tight and results predictable.
+  // Both are covered by @@index([companyId, departureTime]).
+  const thirtyDaysAgo   = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  // Fetch upcoming trips — nearest first.
-  const upcomingRaw = await prisma.trip.findMany({
-    where: {
-      companyId:     session.user.companyId,
-      departureTime: { gte: now },
-    },
-    select: {
-      id:             true,
-      departureTime:  true,
-      status:         true,
-      capacity:       true,
-      automatizado:   true,
-      boat:           { select: { name: true } },
-      branch:         { select: { name: true } },
-      passengerSlots: {
-        where:  { status: { in: ["PENDING", "CONFIRMED"] } },
-        select: { id: true },
+  // Run both queries in parallel — independent result sets.
+  // _count with a filtered relation (Prisma ≥ 4.3) runs a COUNT aggregate
+  // instead of fetching every slot ID row — the main previous bottleneck.
+  const [upcomingRaw, pastRaw] = await Promise.all([
+    // Upcoming: next 30 days, nearest first, max 50.
+    prisma.trip.findMany({
+      where: {
+        companyId:     session.user.companyId,
+        departureTime: { gte: now, lte: thirtyDaysLater },
       },
-    },
-    orderBy: { departureTime: "asc" },
-    take: 50,
-  });
-
-  // Fetch past trips — most recent first.
-  const pastRaw = await prisma.trip.findMany({
-    where: {
-      companyId:     session.user.companyId,
-      departureTime: { lt: now },
-    },
-    select: {
-      id:             true,
-      departureTime:  true,
-      status:         true,
-      capacity:       true,
-      automatizado:   true,
-      boat:           { select: { name: true } },
-      branch:         { select: { name: true } },
-      passengerSlots: {
-        where:  { status: { in: ["PENDING", "CONFIRMED"] } },
-        select: { id: true },
+      select: {
+        id:            true,
+        departureTime: true,
+        status:        true,
+        capacity:      true,
+        automatizado:  true,
+        boat:          { select: { name: true } },
+        branch:        { select: { name: true } },
+        _count: {
+          select: { passengerSlots: { where: { status: { in: ACTIVE_SLOT_STATUSES } } } },
+        },
       },
-    },
-    orderBy: { departureTime: "desc" },
-    take: 30,
-  });
+      orderBy: { departureTime: "asc" },
+      take:    50,
+    }),
+    // Past: last 30 days, most recent first, max 30.
+    prisma.trip.findMany({
+      where: {
+        companyId:     session.user.companyId,
+        departureTime: { gte: thirtyDaysAgo, lt: now },
+      },
+      select: {
+        id:            true,
+        departureTime: true,
+        status:        true,
+        capacity:      true,
+        automatizado:  true,
+        boat:          { select: { name: true } },
+        branch:        { select: { name: true } },
+        _count: {
+          select: { passengerSlots: { where: { status: { in: ACTIVE_SLOT_STATUSES } } } },
+        },
+      },
+      orderBy: { departureTime: "desc" },
+      take:    30,
+    }),
+  ]);
 
   function toItem(t: typeof upcomingRaw[number]): TripItem {
     return {
@@ -64,7 +74,7 @@ export default async function ProveedorViajes() {
       departureTime: t.departureTime,
       status:        t.status,
       capacity:      t.capacity,
-      occupancy:     t.passengerSlots.length,
+      occupancy:     t._count.passengerSlots,
       boatName:      t.boat.name,
       branchName:    t.branch.name,
       automatizado:  t.automatizado,

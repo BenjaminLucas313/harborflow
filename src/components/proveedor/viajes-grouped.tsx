@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
 import { DayDivider } from "@/components/ui/DayDivider";
 import { cn } from "@/lib/utils";
 
@@ -182,6 +182,43 @@ function TripRow({ trip }: { trip: TripItem }) {
 }
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Initial number of calendar-day groups to render in each section. */
+const INITIAL_DAYS_PROXIMOS = 7;
+const INITIAL_DAYS_PASADOS  = 5;
+
+// ---------------------------------------------------------------------------
+// LoadMoreButton
+// ---------------------------------------------------------------------------
+
+function LoadMoreButton({
+  hidden,
+  total,
+  visible,
+  onClick,
+}: {
+  hidden:  number;
+  total:   number;
+  visible: number;
+  onClick: () => void;
+}) {
+  if (hidden <= 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border py-2 text-xs font-medium text-muted-foreground transition hover:bg-muted"
+    >
+      <ChevronRight className="size-3.5" aria-hidden="true" />
+      Ver {hidden} {hidden === 1 ? "día más" : "días más"}
+      <span className="text-muted-foreground/60">({visible}/{total} viajes visibles)</span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
@@ -191,6 +228,9 @@ type Props = {
 };
 
 export function ViajesGrouped({ proximos, pasados }: Props) {
+  const [showAllProximos, setShowAllProximos] = useState(false);
+  const [showAllPasados,  setShowAllPasados]  = useState(false);
+
   if (proximos.length === 0 && pasados.length === 0) {
     return (
       <div className="py-10 text-center text-sm text-muted-foreground">
@@ -202,6 +242,21 @@ export function ViajesGrouped({ proximos, pasados }: Props) {
   const proximosByDay = groupByDay(proximos);
   const pasadosByDay  = groupByDay(pasados);
 
+  // Slice to the initial window; expand on demand.
+  const visibleProximos = showAllProximos
+    ? proximosByDay
+    : proximosByDay.slice(0, INITIAL_DAYS_PROXIMOS);
+
+  const visiblePasados = showAllPasados
+    ? pasadosByDay
+    : pasadosByDay.slice(0, INITIAL_DAYS_PASADOS);
+
+  // Count trips visible vs total for the "Cargar más" label.
+  const proximosVisible = visibleProximos.reduce((n, [, ts]) => n + ts.length, 0);
+  const pasadosVisible  = visiblePasados.reduce((n, [, ts]) => n + ts.length, 0);
+  const hiddenProximosDays = proximosByDay.length - visibleProximos.length;
+  const hiddenPasadosDays  = pasadosByDay.length  - visiblePasados.length;
+
   return (
     <div className="space-y-6">
       {/* ── Próximos ───────────────────────────────────────────────────────── */}
@@ -211,9 +266,9 @@ export function ViajesGrouped({ proximos, pasados }: Props) {
           count={proximos.length}
           defaultOpen={true}
         >
-          {proximosByDay.map(([dateKey, dayTrips], i) => (
+          {visibleProximos.map(([dateKey, dayTrips], i) => (
             <div key={dateKey}>
-              {/* Day divider before each group except if it's the very first */}
+              {/* Every day group gets a divider (first included) */}
               {i > 0 && <DayDivider dateStr={dateKey} />}
               {i === 0 && <DayDivider dateStr={dateKey} />}
               {dayTrips.map((t) => (
@@ -221,6 +276,13 @@ export function ViajesGrouped({ proximos, pasados }: Props) {
               ))}
             </div>
           ))}
+
+          <LoadMoreButton
+            hidden={hiddenProximosDays}
+            total={proximos.length}
+            visible={proximosVisible}
+            onClick={() => setShowAllProximos(true)}
+          />
         </CollapsibleSection>
       )}
 
@@ -236,7 +298,7 @@ export function ViajesGrouped({ proximos, pasados }: Props) {
           count={pasados.length}
           defaultOpen={false}
         >
-          {pasadosByDay.map(([dateKey, dayTrips]) => (
+          {visiblePasados.map(([dateKey, dayTrips]) => (
             <div key={dateKey}>
               <DayDivider dateStr={dateKey} />
               {dayTrips.map((t) => (
@@ -244,6 +306,13 @@ export function ViajesGrouped({ proximos, pasados }: Props) {
               ))}
             </div>
           ))}
+
+          <LoadMoreButton
+            hidden={hiddenPasadosDays}
+            total={pasados.length}
+            visible={pasadosVisible}
+            onClick={() => setShowAllPasados(true)}
+          />
         </CollapsibleSection>
       )}
     </div>

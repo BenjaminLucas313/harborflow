@@ -59,24 +59,40 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Find all template trips ──────────────────────────────────────────────────
+  //
+  // Key design decisions:
+  //
+  // 1. CANCELLED is the only excluded status.
+  //    Excluding DEPARTED/COMPLETED broke the chain: once today's automated trip
+  //    departed, the job had no template to base tomorrow's trip on.
+  //    A DEPARTED trip still carries valid metadata (boat, branch, hora) — we just
+  //    need it as a data source, not as an active trip.
+  //
+  // 2. distinct: ["boatId", "branchId", "horaRecurrente"] + orderBy desc.
+  //    Prevents the template list from growing linearly as automated trips
+  //    accumulate. We get exactly ONE row per schedule — the most recent — so
+  //    the idempotency check is the only deduplication needed.
   const templates = await prisma.trip.findMany({
     where: {
-      automatizado: true,
+      automatizado:   true,
       horaRecurrente: { not: null },
-      // Only use active (non-terminal) templates so cancelled trips don't keep spawning.
-      status: { notIn: ["CANCELLED", "DEPARTED", "COMPLETED"] },
+      // Only respect the explicit cancellation signal from the proveedor.
+      status: { not: "CANCELLED" },
     },
     select: {
-      id:               true,
-      companyId:        true,
-      branchId:         true,
-      boatId:           true,
-      driverId:         true,
-      capacity:         true,
-      waitlistEnabled:  true,
-      notes:            true,
-      horaRecurrente:   true,
+      id:              true,
+      companyId:       true,
+      branchId:        true,
+      boatId:          true,
+      driverId:        true,
+      capacity:        true,
+      waitlistEnabled: true,
+      notes:           true,
+      horaRecurrente:  true,
     },
+    orderBy: { departureTime: "desc" },
+    // Deduplicate at DB level: one template per (boat × branch × hora) combo.
+    distinct: ["boatId", "branchId", "horaRecurrente"],
   });
 
   const now = new Date();

@@ -5,11 +5,13 @@
 // Owns the unified filter bar (Puerto · Mes · Año · Departamento · Desde · Hasta)
 // and passes controlled filter values + triggerFetch to UablMetricasDashboard.
 // SnapshotComparativo is rendered below with its own independent period selector.
+// InformeNarrativoCard is rendered last — monthly AI executive report.
 
 import { useState, useCallback } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
-import { UablMetricasDashboard } from "./UablMetricasDashboard";
-import { SnapshotComparativo }   from "./SnapshotComparativo";
+import { UablMetricasDashboard }    from "./UablMetricasDashboard";
+import { SnapshotComparativo }      from "./SnapshotComparativo";
+import { InformeNarrativoCard }     from "./InformeNarrativoCard";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -207,6 +209,11 @@ export function MetricasPageClient({
 
       {/* ── Snapshot comparativo (own period selector — historical trend) ───── */}
       <SnapshotComparativo />
+
+      <hr className="border-border" />
+
+      {/* ── Informe narrativo mensual (AI executive report) ─────────────────── */}
+      <InformeNarrativoCard />
     </div>
   );
 }

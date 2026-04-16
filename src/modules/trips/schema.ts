@@ -27,7 +27,22 @@ export const UpdateTripStatusSchema = z.object({
   statusReason: z.string().optional(),
 });
 
-export const UpdateTripSchema = CreateTripSchema.partial().omit({ companyId: true, branchId: true });
+// Defined from scratch — cannot use .partial() on a schema with .refine() in Zod v4.
+// The refinement (horaRecurrente required when automatizado = true) is intentionally
+// omitted here because a PATCH update may supply only a subset of fields.
+export const UpdateTripSchema = z.object({
+  boatId:               z.string().optional(),
+  driverId:             z.string().optional(),
+  departureTime:        z.coerce.date().optional(),
+  estimatedArrivalTime: z.coerce.date().optional(),
+  waitlistEnabled:      z.boolean().optional(),
+  notes:                z.string().optional(),
+  automatizado:         z.boolean().optional(),
+  horaRecurrente:       z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido")
+    .optional(),
+});
 
 export type CreateTripInput = z.infer<typeof CreateTripSchema>;
 export type UpdateTripInput = z.infer<typeof UpdateTripSchema>;
