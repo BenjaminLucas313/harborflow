@@ -11,7 +11,8 @@
     "db:mark-past": "cross-env DRY_RUN=false tsx prisma/scripts/mark-past-trips.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "snapshot:generar": "cross-env MES=anterior tsx --env-file=.env src/scripts/generar-snapshot.ts"
+    "snapshot:generar": "cross-env MES=anterior tsx --env-file=.env src/scripts/generar-snapshot.ts",
+    "viajes:automatizar": "cross-env tsx --env-file=.env -e \"fetch('http://localhost:3000/api/jobs/crear-viajes-automatizados',{method:'POST',headers:{'x-job-secret':process.env.JOB_SECRET??''}}).then(r=>r.json()).then(console.log)\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",

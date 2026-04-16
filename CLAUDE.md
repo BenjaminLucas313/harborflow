@@ -340,3 +340,12 @@ Skills are located in `.claude/skills/`. Claude should consult the relevant skil
 - SIEMPRE validar fechas con timezone Argentina (UTC-3)
 - Los endpoints de API deben seguir el patrón en `api-design-guide`
 - Toda migración de DB pasa por `db-guardian` primero
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)

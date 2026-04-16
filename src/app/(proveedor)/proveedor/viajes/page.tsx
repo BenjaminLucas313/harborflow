@@ -23,6 +23,7 @@ export default async function ProveedorViajes() {
       departureTime:  true,
       status:         true,
       capacity:       true,
+      automatizado:   true,
       boat:           { select: { name: true } },
       branch:         { select: { name: true } },
       passengerSlots: {
@@ -45,6 +46,7 @@ export default async function ProveedorViajes() {
       departureTime:  true,
       status:         true,
       capacity:       true,
+      automatizado:   true,
       boat:           { select: { name: true } },
       branch:         { select: { name: true } },
       passengerSlots: {
@@ -65,6 +67,7 @@ export default async function ProveedorViajes() {
       occupancy:     t.passengerSlots.length,
       boatName:      t.boat.name,
       branchName:    t.branch.name,
+      automatizado:  t.automatizado,
     };
   }
 

@@ -25,6 +25,23 @@ export function LoginForm() {
   });
 
   const onSubmit = async (data: LoginInput) => {
+    // Pre-check: verify company + user existence before calling signIn so we
+    // can show a specific message instead of the generic "invalid credentials".
+    const checkRes = await fetch(
+      `/api/auth/check-account?email=${encodeURIComponent(data.email)}&companySlug=${encodeURIComponent(data.companySlug)}`,
+    );
+    if (checkRes.ok) {
+      const check = await checkRes.json() as { found: boolean; reason?: string };
+      if (!check.found) {
+        if (check.reason === "NO_COMPANY") {
+          setError("companySlug", { message: t("errors.companyNotFound") });
+        } else {
+          setError("email", { message: t("errors.userNotFound") });
+        }
+        return;
+      }
+    }
+
     const result = await signIn("credentials", {
       email: data.email,
       password: data.password,
@@ -33,7 +50,7 @@ export function LoginForm() {
     });
 
     if (!result?.ok) {
-      setError("root", { message: t("errors.invalidCredentials") });
+      setError("password", { message: t("errors.wrongPassword") });
       return;
     }
 

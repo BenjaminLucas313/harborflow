@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Building2, Wrench } from "lucide-react";
+import { Building2, Wrench, Users } from "lucide-react";
 
 export default async function UablAdmin() {
   const session = await auth();
@@ -11,9 +11,10 @@ export default async function UablAdmin() {
 
   const { companyId } = session.user;
 
-  const [deptCount, workTypeCount] = await Promise.all([
+  const [deptCount, workTypeCount, userCount] = await Promise.all([
     prisma.department.count({ where: { companyId, isActive: true } }),
     prisma.workType.count({ where: { companyId, isActive: true } }),
+    prisma.user.count({ where: { companyId, isActive: true } }),
   ]);
 
   return (
@@ -59,6 +60,23 @@ export default async function UablAdmin() {
           </div>
           <p className="text-xs text-muted-foreground">
             Definí los tipos de trabajo disponibles y asignalos a sus departamentos correspondientes.
+          </p>
+        </Link>
+        <Link
+          href="/uabl/admin/usuarios"
+          className="rounded-2xl border border-border bg-card p-6 space-y-3 hover:shadow-sm transition-shadow group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-100 p-2.5">
+              <Users className="size-5 text-emerald-700" />
+            </div>
+            <div>
+              <p className="font-semibold group-hover:text-primary transition-colors">Gestión de usuarios</p>
+              <p className="text-sm text-muted-foreground">{userCount} activos</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Creá usuarios UABL, PROVEEDOR y EMPRESA. Los usuarios creados aquí reciben sus credenciales directamente.
           </p>
         </Link>
       </div>

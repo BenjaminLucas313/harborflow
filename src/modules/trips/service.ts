@@ -4,7 +4,7 @@ import { TripStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { logAction } from "@/modules/audit/repository";
-import { isTripAvailable } from "@/lib/date-utils";
+import { isDatePast } from "@/lib/date-utils";
 import {
   createTrip as repoCreateTrip,
   listTripsByBranch as repoListTripsByBranch,
@@ -42,11 +42,11 @@ export async function createTrip(
 ): Promise<TripRow> {
   const { actorId, ...tripInput } = input;
 
-  // 0. Validate departure time — must be at least 1 hour in the future.
-  if (!isTripAvailable(tripInput.departureTime)) {
+  // 0. Validate departure time — must not be in the past.
+  if (isDatePast(tripInput.departureTime)) {
     throw new AppError(
       "TRIP_DEPARTURE_PAST",
-      "La fecha de salida debe ser al menos 1 hora en el futuro.",
+      "La fecha de salida no puede estar en el pasado.",
       400,
     );
   }
@@ -101,6 +101,8 @@ export async function createTrip(
     capacity: boat.capacity,
     waitlistEnabled: tripInput.waitlistEnabled,
     notes: tripInput.notes,
+    automatizado: tripInput.automatizado,
+    horaRecurrente: tripInput.horaRecurrente,
   });
 
   // 4. Audit trail — non-blocking best-effort; failure logged, not surfaced.

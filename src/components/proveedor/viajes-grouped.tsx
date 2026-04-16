@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import { DayDivider } from "@/components/ui/DayDivider";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export type TripItem = {
   occupancy:     number;   // pre-computed slot count passed from server
   boatName:      string;
   branchName:    string;
+  automatizado?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -158,6 +159,12 @@ function TripRow({ trip }: { trip: TripItem }) {
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
+        {trip.automatizado && (
+          <span title="Programado automáticamente" className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <RefreshCw className="size-3" aria-hidden="true" />
+            Auto
+          </span>
+        )}
         <span className="text-sm text-muted-foreground tabular-nums">
           {trip.occupancy}/{trip.capacity}
         </span>

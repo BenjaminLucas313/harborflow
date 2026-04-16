@@ -90,6 +90,30 @@ export default async function ProveedorDashboard() {
         </Link>
       </div>
 
+      {/* Navigation */}
+      <nav className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { href: "/proveedor/barcos",      icon: Ship,   label: "Barcos",      desc: "Gestionar la flota y capacidades." },
+          { href: "/proveedor/viajes",      icon: Anchor, label: "Viajes",      desc: "Crear y editar viajes programados." },
+          { href: "/proveedor/puerto",      icon: MapPin, label: "Puerto",      desc: "Abrir, cerrar y comunicar el estado." },
+          { href: "/proveedor/solicitudes", icon: Send,   label: "Solicitudes", desc: "Revisar pedidos de lancha bajo demanda." },
+        ].map(({ href, icon: Icon, label, desc }) => (
+          <Link
+            key={href}
+            href={href}
+            className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <div className="rounded-xl bg-primary/10 p-2">
+                <Icon className="size-4 text-primary" />
+              </div>
+              <span className="font-semibold">{label}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">{desc}</p>
+          </Link>
+        ))}
+      </nav>
+
       {/* Today's trips */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -132,30 +156,6 @@ export default async function ProveedorDashboard() {
           </ul>
         )}
       </div>
-
-      {/* Navigation */}
-      <nav className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { href: "/proveedor/barcos",      icon: Ship,   label: "Barcos",      desc: "Gestionar la flota y capacidades." },
-          { href: "/proveedor/viajes",      icon: Anchor, label: "Viajes",      desc: "Crear y editar viajes programados." },
-          { href: "/proveedor/puerto",      icon: MapPin, label: "Puerto",      desc: "Abrir, cerrar y comunicar el estado." },
-          { href: "/proveedor/solicitudes", icon: Send,   label: "Solicitudes", desc: "Revisar pedidos de lancha bajo demanda." },
-        ].map(({ href, icon: Icon, label, desc }) => (
-          <Link
-            key={href}
-            href={href}
-            className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <div className="rounded-xl bg-primary/10 p-2">
-                <Icon className="size-4 text-primary" />
-              </div>
-              <span className="font-semibold">{label}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">{desc}</p>
-          </Link>
-        ))}
-      </nav>
     </main>
   );
 }

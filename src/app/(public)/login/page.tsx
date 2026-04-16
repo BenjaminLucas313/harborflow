@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Anchor } from "lucide-react";
 import { LoginForm } from "@/components/auth/login-form";
@@ -36,16 +35,6 @@ export default async function LoginPage() {
           <LoginForm />
         </div>
 
-        {/* Register link */}
-        <p className="text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Create one
-          </Link>
-        </p>
       </div>
     </main>
   );

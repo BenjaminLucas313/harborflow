@@ -11,7 +11,16 @@ export const CreateTripSchema = z.object({
   estimatedArrivalTime: z.coerce.date().optional(),
   waitlistEnabled: z.boolean().default(true),
   notes: z.string().optional(),
-});
+  automatizado: z.boolean().default(false),
+  /** "HH:MM" in Argentina local time (UTC-3). Required when automatizado = true. */
+  horaRecurrente: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido")
+    .optional(),
+}).refine(
+  (d) => !d.automatizado || !!d.horaRecurrente,
+  { message: "horaRecurrente es requerida cuando automatizado es true", path: ["horaRecurrente"] },
+);
 
 export const UpdateTripStatusSchema = z.object({
   status: z.enum(Object.values(TripStatus) as [string, ...string[]]),

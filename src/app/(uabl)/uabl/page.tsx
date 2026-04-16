@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Anchor, Ship, BarChart3, Settings, ChevronRight } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { AlertasAnomalias } from "@/components/uabl/AlertasAnomalias";
 
 export default async function UablDashboard() {
   const session = await auth();
@@ -163,6 +164,8 @@ export default async function UablDashboard() {
           </Link>
         )}
       </nav>
+
+      <AlertasAnomalias />
     </main>
   );
 }

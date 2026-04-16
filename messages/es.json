@@ -22,7 +22,10 @@
         "submitting": "Iniciando sesión…"
       },
       "errors": {
-        "invalidCredentials": "Credenciales inválidas. Verifica tu organización, correo y contraseña."
+        "invalidCredentials": "Credenciales inválidas. Verifica tu organización, correo y contraseña.",
+        "companyNotFound": "Organización no encontrada. Verificá el identificador e intentá de nuevo.",
+        "userNotFound": "No existe una cuenta con ese correo en esta organización.",
+        "wrongPassword": "Contraseña incorrecta."
       }
     },
     "register": {

@@ -39,6 +39,7 @@ export type ErrorCode =
   | "GROUP_BOOKING_NOT_DRAFT"        // Tried to add/remove slots after submission
   | "GROUP_BOOKING_NOT_SUBMITTED"    // Tried to review before submission
   | "GROUP_BOOKING_FORBIDDEN"        // EMPRESA tried to access another employer's booking
+  | "TRIP_CAPACITY_INSUFFICIENT"     // Pre-flight: not enough seats for requested slot count
   // ── V2 Passenger Slot ──────────────────────────────────────────────────────
   | "SLOT_NOT_FOUND"
   | "SLOT_ALREADY_ASSIGNED"          // USUARIO already on this trip (@@unique violated)

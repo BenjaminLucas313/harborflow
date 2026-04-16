@@ -22,7 +22,10 @@
         "submitting": "Signing in…"
       },
       "errors": {
-        "invalidCredentials": "Invalid credentials. Please check your organisation, email, and password."
+        "invalidCredentials": "Invalid credentials. Please check your organisation, email, and password.",
+        "companyNotFound": "Organisation not found. Check the identifier and try again.",
+        "userNotFound": "No account found with that email in this organisation.",
+        "wrongPassword": "Incorrect password."
       }
     },
     "register": {

@@ -1,22 +1,20 @@
 "use client";
 
 // =============================================================================
-// UablMetricasDashboard — Integrated UABL metrics dashboard
+// UablMetricasDashboard — UABL metrics dashboard (controlled/stateless filters)
 // =============================================================================
 //
-// Unified filter bar:
-//   Puerto (branch)  Mes  Año  Departamento  Desde  Hasta  [Filtrar] [CSV] [PDF]
-//
-// When Mes/Año changes, Desde/Hasta are auto-synced to the full calendar month
-// (Argentina timezone). The user can override them independently.
+// Filter state lives in MetricasPageClient. This component receives filter values
+// as props and re-fetches when triggerFetch increments.
 //
 // Sections rendered:
-//   1. KPI summary cards (4)
-//   2. Bar chart — seats per department in the period
-//   3. Line chart  — daily occupancy %
-//   4. Liquidation table — per-dept totals with settlement state
-//   5. Efficiency alerts — low-occupancy boats, solo-dept trips, peak hours
-//   6. Per-trip breakdown — collapsible, uses branch + date range
+//   1. Export buttons (CSV / PDF)
+//   2. KPI summary cards (4)
+//   3. Bar chart — seats per department in the period
+//   4. Line chart  — daily occupancy %
+//   5. Liquidation table — per-dept totals with settlement state
+//   6. Efficiency alerts — low-occupancy boats, solo-dept trips, peak hours
+//   7. Per-trip breakdown — collapsible, uses branch + date range
 //
 // All data is fetched client-side via:
 //   /api/metricas              → monthly summary (KPIs, charts, liquidation)
@@ -25,14 +23,14 @@
 //
 // =============================================================================
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
   LineChart, Line,
 } from "recharts";
 import {
   AlertTriangle, Download, FileText, TrendingDown, Users, Ship,
-  Clock, Loader2, ChevronDown, RefreshCw,
+  Clock, Loader2, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { exportToCSV } from "@/lib/export";
@@ -63,12 +61,20 @@ type TripRow = {
   }>;
 };
 
+// Props are now fully controlled — filter state lives in MetricasPageClient.
 type Props = {
-  branches:        Branch[];
-  departments:     Dept[];
-  defaultMes:      number;
-  defaultAnio:     number;
-  defaultBranchId: string;
+  branches:            Branch[];
+  departments:         Dept[];
+  mes:                 number;
+  anio:                number;
+  branchId:            string;
+  deptId:              string;
+  dateFrom:            string;
+  dateTo:              string;
+  /** Increment this value to trigger a data fetch. */
+  triggerFetch:        number;
+  /** Called with true when loading starts, false when loading ends. */
+  onFetchStateChange?: (loading: boolean) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -79,27 +85,6 @@ const MONTH_NAMES = [
   "Enero","Febrero","Marzo","Abril","Mayo","Junio",
   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
 ];
-
-const CURRENT_YEAR = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i);
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** YYYY-MM-DD string for the first day of a month (Argentina UTC-3). */
-function monthStart(mes: number, anio: number): string {
-  // April 1 ART 00:00 = April 1 UTC 03:00 → date part is still April 1.
-  return `${anio}-${String(mes).padStart(2, "0")}-01`;
-}
-
-/** YYYY-MM-DD string for the last day of a month. */
-function monthEnd(mes: number, anio: number): string {
-  // Day 0 of month+1 = last day of month.
-  const d = new Date(Date.UTC(anio, mes, 0));   // mes is 1-indexed, so mes+0 = last day of mes-1... wait
-  // Date.UTC(anio, mes, 0): month is 0-indexed in Date.UTC, so mes=4 → May, day 0 → April 30 ✓
-  return d.toISOString().split("T")[0] ?? `${anio}-${String(mes).padStart(2, "0")}-30`;
-}
 
 function pct(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
@@ -147,29 +132,9 @@ function KpiCard({
 // ---------------------------------------------------------------------------
 
 export function UablMetricasDashboard({
-  branches, departments, defaultMes, defaultAnio, defaultBranchId,
+  branches, departments, mes, anio, branchId, deptId, dateFrom, dateTo,
+  triggerFetch, onFetchStateChange,
 }: Props) {
-  // ── Filter state ──────────────────────────────────────────────────────────
-  const [mes,      setMesRaw]   = useState(defaultMes);
-  const [anio,     setAnioRaw]  = useState(defaultAnio);
-  const [deptId,   setDeptId]   = useState("");
-  const [branchId, setBranchId] = useState(defaultBranchId);
-  const [dateFrom, setDateFrom] = useState(() => monthStart(defaultMes, defaultAnio));
-  const [dateTo,   setDateTo]   = useState(() => monthEnd(defaultMes, defaultAnio));
-
-  // When month/year changes, auto-sync date range pickers.
-  const setMes = useCallback((m: number) => {
-    setMesRaw(m);
-    setDateFrom(monthStart(m, anio));
-    setDateTo(monthEnd(m, anio));
-  }, [anio]);
-
-  const setAnio = useCallback((a: number) => {
-    setAnioRaw(a);
-    setDateFrom(monthStart(mes, a));
-    setDateTo(monthEnd(mes, a));
-  }, [mes]);
-
   // ── Fetched data ──────────────────────────────────────────────────────────
   const [metrics,      setMetrics]      = useState<AdminMetrics | null>(null);
   const [eficiency,    setEficiency]    = useState<EficienciaMetrics | null>(null);
@@ -179,11 +144,9 @@ export function UablMetricasDashboard({
   const [tripsOpen,    setTripsOpen]    = useState(false);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
-  // Use a ref to track whether this is the first render (auto-fetch on mount).
-  const didMount = useRef(false);
-
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    onFetchStateChange?.(true);
     setError(null);
     try {
       const mParams = new URLSearchParams({ mes: String(mes), anio: String(anio) });
@@ -219,15 +182,15 @@ export function UablMetricasDashboard({
       setError(err instanceof Error ? err.message : "Error desconocido.");
     } finally {
       setLoading(false);
+      onFetchStateChange?.(false);
     }
-  }, [mes, anio, deptId, branchId, dateFrom, dateTo]);
+  }, [mes, anio, deptId, branchId, dateFrom, dateTo, onFetchStateChange]);
 
+  // Fetch on mount (triggerFetch=0) and whenever triggerFetch increments.
   useEffect(() => {
-    if (!didMount.current) {
-      didMount.current = true;
-      void fetchAll();
-    }
-  }, [fetchAll]);
+    void fetchAll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [triggerFetch]);
 
   // ── Export ─────────────────────────────────────────────────────────────────
   function handleExportCSV() {
@@ -266,137 +229,35 @@ export function UablMetricasDashboard({
   return (
     <div className="space-y-8 print:space-y-6">
 
-      {/* ── Filter bar ──────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-border bg-card p-4 print:hidden">
-        <div className="flex flex-wrap items-end gap-3">
-
-          {/* Puerto (branch) */}
-          <div className="space-y-1">
-            <label htmlFor="f-branch" className="text-xs font-medium text-muted-foreground">Puerto</label>
-            <select
-              id="f-branch"
-              value={branchId}
-              onChange={(e) => setBranchId(e.target.value)}
-              className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-
-          {/* Mes */}
-          <div className="space-y-1">
-            <label htmlFor="f-mes" className="text-xs font-medium text-muted-foreground">Mes</label>
-            <select
-              id="f-mes"
-              value={mes}
-              onChange={(e) => setMes(Number(e.target.value))}
-              className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {MONTH_NAMES.map((name, i) => (
-                <option key={i + 1} value={i + 1}>{name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Año */}
-          <div className="space-y-1">
-            <label htmlFor="f-anio" className="text-xs font-medium text-muted-foreground">Año</label>
-            <select
-              id="f-anio"
-              value={anio}
-              onChange={(e) => setAnio(Number(e.target.value))}
-              className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-
-          {/* Departamento */}
-          <div className="space-y-1">
-            <label htmlFor="f-dept" className="text-xs font-medium text-muted-foreground">Departamento</label>
-            <select
-              id="f-dept"
-              value={deptId}
-              onChange={(e) => setDeptId(e.target.value)}
-              className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="">Todos</option>
-              {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
-
-          {/* Separator */}
-          <div className="h-9 w-px bg-border mx-1 self-end hidden sm:block" />
-
-          {/* Desde */}
-          <div className="space-y-1">
-            <label htmlFor="f-from" className="text-xs font-medium text-muted-foreground">Desde</label>
-            <input
-              id="f-from"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          {/* Hasta */}
-          <div className="space-y-1">
-            <label htmlFor="f-to" className="text-xs font-medium text-muted-foreground">Hasta</label>
-            <input
-              id="f-to"
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          {/* Filtrar */}
-          <button
-            type="button"
-            onClick={() => void fetchAll()}
-            disabled={loading}
-            className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-1.5 self-end"
+      {/* ── Export buttons (filter bar lives in MetricasPageClient) ──────────── */}
+      <div className="flex gap-2 print:hidden">
+        <button
+          type="button"
+          onClick={handleExportCSV}
+          disabled={!metrics || loading}
+          className="flex items-center gap-1.5 h-9 rounded-lg border border-input bg-background px-3 text-sm hover:bg-muted transition-colors disabled:opacity-40"
+        >
+          <Download className="size-4" aria-hidden="true" />
+          CSV
+        </button>
+        {metrics && !loading ? (
+          <a
+            href={`/api/metricas/export/pdf?mes=${mes}&anio=${anio}${deptId ? `&departamentoId=${deptId}` : ""}`}
+            download
+            className="flex items-center gap-1.5 h-9 rounded-lg border border-input bg-background px-3 text-sm hover:bg-muted transition-colors"
           >
-            {loading
-              ? <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              : <RefreshCw className="size-4" aria-hidden="true" />
-            }
-            Filtrar
-          </button>
-
-          {/* Export buttons */}
-          <div className="ml-auto flex gap-2 self-end">
-            <button
-              type="button"
-              onClick={handleExportCSV}
-              disabled={!metrics || loading}
-              className="flex items-center gap-1.5 h-9 rounded-lg border border-input bg-background px-3 text-sm hover:bg-muted transition-colors disabled:opacity-40"
-            >
-              <Download className="size-4" aria-hidden="true" />
-              CSV
-            </button>
-            {metrics && !loading ? (
-              <a
-                href={`/api/metricas/export/pdf?mes=${mes}&anio=${anio}${deptId ? `&departamentoId=${deptId}` : ""}`}
-                download
-                className="flex items-center gap-1.5 h-9 rounded-lg border border-input bg-background px-3 text-sm hover:bg-muted transition-colors"
-              >
-                <FileText className="size-4" aria-hidden="true" />
-                PDF
-              </a>
-            ) : (
-              <span
-                aria-disabled="true"
-                className="flex items-center gap-1.5 h-9 rounded-lg border border-input bg-background px-3 text-sm opacity-40 cursor-not-allowed select-none"
-              >
-                <FileText className="size-4" aria-hidden="true" />
-                PDF
-              </span>
-            )}
-          </div>
-        </div>
+            <FileText className="size-4" aria-hidden="true" />
+            PDF
+          </a>
+        ) : (
+          <span
+            aria-disabled="true"
+            className="flex items-center gap-1.5 h-9 rounded-lg border border-input bg-background px-3 text-sm opacity-40 cursor-not-allowed select-none"
+          >
+            <FileText className="size-4" aria-hidden="true" />
+            PDF
+          </span>
+        )}
       </div>
 
       {/* ── Loading ──────────────────────────────────────────────────────────── */}

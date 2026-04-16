@@ -21,6 +21,8 @@ const TRIP_SELECT = {
   waitlistEnabled: true,
   statusReason: true,
   notes: true,
+  automatizado: true,
+  horaRecurrente: true,
   createdAt: true,
   updatedAt: true,
   boat: { select: { id: true, name: true } },
@@ -55,6 +57,8 @@ export type CreateTripData = {
   capacity: number;
   waitlistEnabled: boolean;
   notes?: string;
+  automatizado?: boolean;
+  horaRecurrente?: string;
 };
 
 export async function createTrip(data: CreateTripData): Promise<TripRow> {
@@ -69,6 +73,8 @@ export async function createTrip(data: CreateTripData): Promise<TripRow> {
       capacity: data.capacity,
       waitlistEnabled: data.waitlistEnabled,
       notes: data.notes,
+      automatizado: data.automatizado ?? false,
+      horaRecurrente: data.horaRecurrente,
     },
     select: TRIP_SELECT,
   });

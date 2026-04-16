@@ -1,8 +1,11 @@
 import { z } from "zod";
 
 export const CreateGroupBookingSchema = z.object({
-  tripId: z.string(),
-  notes:  z.string().max(500).optional(),
+  tripId:         z.string(),
+  notes:          z.string().max(500).optional(),
+  /** Optional pre-flight check: if provided, the service will verify that at
+   *  least this many seats are available before creating the booking. */
+  slotsRequested: z.number().int().min(1).optional(),
 });
 
 export const AddSlotSchema = z.object({

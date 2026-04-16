@@ -53,7 +53,16 @@ export async function createGroupBooking(
 ): Promise<GroupBooking> {
   const trip = await prisma.trip.findUnique({
     where:  { id: input.tripId },
-    select: { id: true, companyId: true, branchId: true, status: true },
+    select: {
+      id:       true,
+      companyId: true,
+      branchId: true,
+      status:   true,
+      capacity: true,
+      passengerSlots: input.slotsRequested
+        ? { where: { status: { in: ["PENDING", "CONFIRMED"] } }, select: { id: true } }
+        : undefined,
+    },
   });
 
   if (!trip || trip.companyId !== ctx.companyId) {
@@ -63,6 +72,20 @@ export async function createGroupBooking(
   const bookableStatuses = ["SCHEDULED", "BOARDING", "DELAYED"] as const;
   if (!bookableStatuses.includes(trip.status as typeof bookableStatuses[number])) {
     throw new AppError("TRIP_NOT_BOOKABLE", "El viaje no está disponible para reservas.", 409);
+  }
+
+  // Optional capacity pre-check (best-effort, non-transactional).
+  // The definitive capacity guard is in addSlotToBooking (FOR UPDATE lock).
+  if (input.slotsRequested && trip.passengerSlots) {
+    const occupied  = trip.passengerSlots.length;
+    const available = trip.capacity - occupied;
+    if (input.slotsRequested > available) {
+      throw new AppError(
+        "TRIP_CAPACITY_INSUFFICIENT",
+        `Solo quedan ${available} asientos disponibles para este viaje.`,
+        409,
+      );
+    }
   }
 
   const booking = await repoCreate({
