@@ -70,6 +70,7 @@ export async function PATCH(
       companyId:    session.user.companyId,
       reviewedById: session.user.id,
       departmentId: session.user.departmentId,
+      isUablAdmin:  session.user.isUablAdmin,
     });
 
     return NextResponse.json(slot);

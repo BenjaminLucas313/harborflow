@@ -37,13 +37,21 @@ export default async function BookingDetail({
       capacity:      true,
       boat:          { select: { name: true } },
       branch:        { select: { name: true } },
+      // Real trip-wide occupancy (all bookings, not just this one).
+      _count: {
+        select: {
+          passengerSlots: { where: { status: { in: ["PENDING", "CONFIRMED"] } } },
+        },
+      },
     },
   });
 
+  // Booking-level breakdown for the seat grid and status display.
   const pendingSlots   = booking.passengerSlots.filter((s) => s.status === "PENDING").length;
   const confirmedSlots = booking.passengerSlots.filter((s) => s.status === "CONFIRMED").length;
-  const occupied       = pendingSlots + confirmedSlots;
-  const available      = (trip?.capacity ?? 0) - occupied;
+  // Trip-wide occupancy (includes all companies' bookings on this trip).
+  const occupied  = trip?._count.passengerSlots ?? 0;
+  const available = (trip?.capacity ?? 0) - occupied;
 
   const departure = trip
     ? new Date(trip.departureTime).toLocaleString("es-AR", {

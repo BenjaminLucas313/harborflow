@@ -1,6 +1,6 @@
 // Trip service: create, update, status transitions. Snapshots boat.capacity at creation time.
 
-import { TripStatus } from "@prisma/client";
+import { TripStatus, ViajeStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/lib/errors";
 import { logAction } from "@/modules/audit/repository";
@@ -154,4 +154,98 @@ export async function listTripsByBranch(
   }
 
   return repoListTripsByBranch(filter);
+}
+
+// ---------------------------------------------------------------------------
+// Cancel (with cascade)
+// ---------------------------------------------------------------------------
+
+export type CancelTripResult = {
+  tripId:              string;
+  groupBookingsCancelled: number;
+  slotsCancelled:      number;
+  /** userId list for downstream notification creation. */
+  affectedUserIds:     string[];
+};
+
+/**
+ * Cancels a trip and cascades the cancellation atomically:
+ *   1. Trip status → CANCELLED, viajeStatus → CANCELADO
+ *   2. All GroupBookings on this trip → CANCELLED
+ *   3. All PassengerSlots on this trip (PENDING | CONFIRMED) → CANCELLED
+ *
+ * Returns the list of affected USUARIO ids so the caller can create
+ * in-app notifications (kept outside the transaction to stay best-effort).
+ *
+ * Throws:
+ *   NOT_FOUND (404)   — trip not found or wrong company
+ *   CONFLICT (409)    — trip is already CANCELLED
+ */
+export async function cancelTrip(
+  tripId:    string,
+  companyId: string,
+  actorId:   string,
+  isDeleteRequest = false,
+): Promise<CancelTripResult> {
+  const trip = await prisma.trip.findFirst({
+    where:  { id: tripId, companyId },
+    select: {
+      id:            true,
+      status:        true,
+      departureTime: true,
+      boat:          { select: { name: true } },
+    },
+  });
+
+  if (!trip) {
+    throw new AppError("NOT_FOUND", "Viaje no encontrado.", 404);
+  }
+  if (trip.status === TripStatus.CANCELLED) {
+    throw new AppError("CONFLICT", "El viaje ya está cancelado.", 409);
+  }
+
+  // Collect affected slot users before the transaction.
+  const affectedSlots = await prisma.passengerSlot.findMany({
+    where:  { tripId, status: { in: ["PENDING", "CONFIRMED"] } },
+    select: { usuarioId: true },
+  });
+  const affectedUserIds = [...new Set(affectedSlots.map((s) => s.usuarioId))];
+
+  // Atomic cascade.
+  const [, gbResult, slotResult] = await prisma.$transaction([
+    prisma.trip.update({
+      where: { id: tripId },
+      data:  { status: TripStatus.CANCELLED, viajeStatus: ViajeStatus.CANCELADO },
+    }),
+    prisma.groupBooking.updateMany({
+      where: { tripId, status: { notIn: ["CANCELLED"] } },
+      data:  { status: "CANCELLED" },
+    }),
+    prisma.passengerSlot.updateMany({
+      where: { tripId, status: { in: ["PENDING", "CONFIRMED"] } },
+      data:  { status: "CANCELLED" },
+    }),
+  ]);
+
+  logAction({
+    companyId,
+    actorId,
+    action:     "TRIP_STATUS_CHANGED",
+    entityType: "Trip",
+    entityId:   tripId,
+    payload: {
+      from:            trip.status,
+      to:              "CANCELLED",
+      groupBookingsCancelled: gbResult.count,
+      slotsCancelled:  slotResult.count,
+      ...(isDeleteRequest ? { isDeleteRequest: true } : {}),
+    },
+  }).catch(() => {});
+
+  return {
+    tripId,
+    groupBookingsCancelled: gbResult.count,
+    slotsCancelled:         slotResult.count,
+    affectedUserIds,
+  };
 }

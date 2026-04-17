@@ -195,6 +195,8 @@ enum AuditAction {
   ANOMALIA_NOTIFICADA
   // ── V2: Narrative reports ─────────────────────────────────────────────────
   INFORME_GENERADO
+  // ── V2: Trip automation ───────────────────────────────────────────────────
+  TRIP_DESAUTOMATIZADO
 }
 
 /// Status lifecycle for on-demand boat requests submitted by EMPRESA.
@@ -372,6 +374,8 @@ model User {
   tripRequestsCreated   TripRequest[]   @relation("TripRequestCreator")
   /// TripRequests reviewed (accepted/rejected) by this PROVEEDOR user.
   tripRequestsReviewed  TripRequest[]   @relation("TripRequestReviewer")
+
+  notificaciones        Notificacion[]
 
   @@unique([companyId, email])
   @@index([companyId, role])
@@ -1175,3 +1179,24 @@ model InformeNarrativo {
 //   and handled by the standard migration. No raw SQL needed.
 //
 // =============================================================================
+
+
+// =============================================================================
+// V2 — NOTIFICACIONES (In-app notification inbox)
+// =============================================================================
+
+model Notificacion {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  companyId String
+  tipo      String
+  titulo    String
+  mensaje   String
+  leida     Boolean  @default(false)
+  accionUrl String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, leida])
+  @@index([userId, createdAt])
+}

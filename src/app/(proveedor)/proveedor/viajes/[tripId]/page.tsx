@@ -53,6 +53,7 @@ export default async function ProveedorTripDetail({
       estimatedArrivalTime: true,
       capacity:             true,
       notes:                true,
+      automatizado:         true,
       boat:    { select: { name: true } },
       branch:  { select: { name: true } },
       driver:  { select: { firstName: true, lastName: true } },
@@ -158,7 +159,7 @@ export default async function ProveedorTripDetail({
       </div>
 
       {/* Status manager */}
-      <TripStatusManager tripId={trip.id} currentStatus={trip.status} />
+      <TripStatusManager tripId={trip.id} currentStatus={trip.status} automatizado={trip.automatizado} />
 
       {/* Passenger manifest */}
       <div className="space-y-3">

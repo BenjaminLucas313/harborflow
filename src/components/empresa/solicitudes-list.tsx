@@ -93,9 +93,11 @@ function ConfirmDialog({ onConfirm, onCancel, isPending }: ConfirmDialogProps) {
 
 type Props = {
   requests: TripRequestWithRelations[];
+  /** When true, cards are rendered dimmed with a "Esta solicitud ya finalizó" label. */
+  dimmed?: boolean;
 };
 
-export function SolicitudesList({ requests }: Props) {
+export function SolicitudesList({ requests, dimmed = false }: Props) {
   const router = useRouter();
   const [confirmId, setConfirmId]       = useState<string | null>(null);
   const [errorMsg, setErrorMsg]         = useState<string | null>(null);
@@ -176,8 +178,15 @@ export function SolicitudesList({ requests }: Props) {
           {requests.map((req) => (
             <li
               key={req.id}
-              className="rounded-2xl border border-border bg-card p-5 space-y-2"
+              className={`rounded-2xl border p-5 space-y-2 ${
+                dimmed
+                  ? "border-border/50 bg-muted/30 opacity-70"
+                  : "border-border bg-card"
+              }`}
             >
+              {dimmed && (
+                <p className="text-xs text-muted-foreground/70 pb-1">Esta solicitud ya finalizó</p>
+              )}
               <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-sm font-medium">

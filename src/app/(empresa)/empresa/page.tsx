@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Ship, ClipboardList, Plus, Send } from "lucide-react";
 import { auth } from "@/lib/auth";
-import { listGroupBookingsByEmployer } from "@/modules/group-bookings/service";
+import { prisma } from "@/lib/prisma";
 
 export default async function EmpresaDashboard() {
   const session = await auth();
@@ -18,13 +18,32 @@ export default async function EmpresaDashboard() {
     );
   }
 
-  const bookings = await listGroupBookingsByEmployer(
-    session.user.companyId,
-    session.user.employerId,
-  );
+  const now     = new Date();
+  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  const pending   = bookings.filter((b) => b.status === "SUBMITTED" || b.status === "PARTIAL").length;
-  const confirmed = bookings.filter((b) => b.status === "CONFIRMED").length;
+  // Card 1: total PENDING PassengerSlots across all active bookings for this employer.
+  const pendingPassengers = await prisma.passengerSlot.count({
+    where: {
+      companyId: session.user.companyId,
+      status:    "PENDING",
+      groupBooking: {
+        employerId: session.user.employerId,
+        status:     { in: ["SUBMITTED", "PARTIAL"] },
+      },
+    },
+  });
+
+  // Card 2: CONFIRMED bookings whose trip departs within the next 7 days.
+  const viajesEstaSemana = await prisma.groupBooking.count({
+    where: {
+      companyId:  session.user.companyId,
+      employerId: session.user.employerId,
+      status:     "CONFIRMED",
+      trip: {
+        departureTime: { gte: now, lte: in7Days },
+      },
+    },
+  });
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10 space-y-8">
@@ -47,12 +66,22 @@ export default async function EmpresaDashboard() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-2xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">En revisión</p>
-          <p className="mt-1 text-3xl font-bold text-amber-600">{pending}</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider">Pendientes UABL</p>
+          <p className="mt-1 text-3xl font-bold text-amber-600">{pendingPassengers}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {pendingPassengers === 1
+              ? "pasajero esperando aprobación"
+              : "pasajeros esperando aprobación"}
+          </p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-5">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Confirmadas</p>
-          <p className="mt-1 text-3xl font-bold text-emerald-600">{confirmed}</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wider">Viajes esta semana</p>
+          <p className="mt-1 text-3xl font-bold text-blue-600">{viajesEstaSemana}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {viajesEstaSemana === 1
+              ? "viaje confirmado en 7 días"
+              : "viajes confirmados en 7 días"}
+          </p>
         </div>
       </div>
 

@@ -35,6 +35,7 @@ export async function reviewSlot(
     companyId:    string;
     reviewedById: string;
     departmentId: string | null;
+    isUablAdmin?: boolean;
   },
 ): Promise<PassengerSlot> {
   const slot = await findSlotById(slotId);
@@ -43,8 +44,11 @@ export async function reviewSlot(
     throw new AppError("SLOT_NOT_FOUND", "Slot no encontrado.", 404);
   }
 
-  // UABL dept authorization — only reviews slots assigned to their department.
-  assertDepartment(ctx.departmentId, slot.departmentId);
+  // UABL admins can review slots across all departments; regular UABL users
+  // are restricted to their own department.
+  if (!ctx.isUablAdmin) {
+    assertDepartment(ctx.departmentId, slot.departmentId);
+  }
 
   if (slot.status !== "PENDING") {
     throw new AppError(
@@ -71,6 +75,9 @@ export async function reviewSlot(
 
   // ── Post-write (best-effort) ───────────────────────────────────────────────
 
+  const reviewedAsAdmin =
+    ctx.isUablAdmin === true && ctx.departmentId !== slot.departmentId;
+
   logAction({
     companyId:  ctx.companyId,
     actorId:    ctx.reviewedById,
@@ -82,6 +89,7 @@ export async function reviewSlot(
       usuarioId:     slot.usuarioId,
       departmentId:  slot.departmentId,
       rejectionNote: input.rejectionNote,
+      ...(reviewedAsAdmin ? { reviewedAsAdmin: true } : {}),
     },
   }).catch(() => {});
 

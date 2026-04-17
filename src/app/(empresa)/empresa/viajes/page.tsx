@@ -22,9 +22,10 @@ export default async function EmpresaViajes() {
       statusReason:  true,
       boat:          { select: { name: true } },
       branch:        { select: { name: true } },
-      passengerSlots: {
-        where:  { status: { in: ["PENDING", "CONFIRMED"] } },
-        select: { id: true },
+      _count: {
+        select: {
+          passengerSlots: { where: { status: { in: ["PENDING", "CONFIRMED"] } } },
+        },
       },
     },
     orderBy: { departureTime: "asc" },
@@ -73,7 +74,7 @@ export default async function EmpresaViajes() {
       ) : (
         <ul className="space-y-3">
           {trips.map((trip) => {
-            const occupied    = trip.passengerSlots.length;
+            const occupied    = trip._count.passengerSlots;
             const available   = trip.capacity - occupied;
             const full        = available <= 0;
             const departure   = new Date(trip.departureTime).toLocaleString("es-AR", {

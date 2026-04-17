@@ -147,7 +147,7 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
         <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
           <input type="checkbox" checked={automatizado} onChange={(e) => setAutomatizado(e.target.checked)}
             className="rounded" />
-          Programar automáticamente para el día siguiente
+          Automatizar viaje (se repetirá diariamente)
         </label>
         {automatizado && (
           <div className="space-y-1 pl-6">

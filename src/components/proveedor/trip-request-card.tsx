@@ -21,6 +21,8 @@ type TripRequestRow = {
 type Props = {
   request: TripRequestRow;
   boats:   Boat[];
+  /** When true the card is rendered as expired — all actions are disabled. */
+  expired?: boolean;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -39,7 +41,7 @@ const STATUS_STYLES: Record<string, string> = {
   CANCELLED: "bg-slate-100 text-slate-600",
 };
 
-export function TripRequestCard({ request, boats }: Props) {
+export function TripRequestCard({ request, boats, expired = false }: Props) {
   const router = useRouter();
 
   const [selectedBoat,   setSelectedBoat]   = useState("");
@@ -91,7 +93,10 @@ export function TripRequestCard({ request, boats }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+    <div className={`rounded-2xl border p-5 space-y-4 ${expired ? "border-border/50 bg-muted/30 opacity-70" : "border-border bg-card"}`}>
+      {expired && (
+        <p className="text-xs text-muted-foreground/70">Esta solicitud venció sin ser atendida</p>
+      )}
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
@@ -124,15 +129,19 @@ export function TripRequestCard({ request, boats }: Props) {
 
         <span
           className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${
-            STATUS_STYLES[request.status] ?? "bg-slate-100 text-slate-600"
+            expired
+              ? "bg-orange-100 text-orange-700"
+              : STATUS_STYLES[request.status] ?? "bg-slate-100 text-slate-600"
           }`}
         >
-          {request.status === "PENDING"
+          {expired
+            ? <XCircle className="size-3" />
+            : request.status === "PENDING"
             ? <Clock className="size-3" />
             : request.status === "FULFILLED" || request.status === "ACCEPTED"
             ? <CheckCircle2 className="size-3" />
             : <XCircle className="size-3" />}
-          {STATUS_LABELS[request.status] ?? request.status}
+          {expired ? "Expirada" : (STATUS_LABELS[request.status] ?? request.status)}
         </span>
       </div>
 
@@ -158,8 +167,8 @@ export function TripRequestCard({ request, boats }: Props) {
         </p>
       )}
 
-      {/* Actions — only for PENDING */}
-      {isPending && (
+      {/* Actions — only for PENDING and not expired */}
+      {isPending && !expired && (
         <div className="space-y-2 pt-1 border-t border-border">
           <div className="flex gap-2">
             <button

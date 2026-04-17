@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
-import { listGroupBookingsByEmployer } from "@/modules/group-bookings/service";
 import { prisma } from "@/lib/prisma";
 import { Plus, ChevronRight } from "lucide-react";
 
@@ -29,21 +28,38 @@ export default async function MisReservas() {
     );
   }
 
-  const bookings = await listGroupBookingsByEmployer(
-    session.user.companyId,
-    session.user.employerId,
-  );
-
-  // Fetch trip details for display.
-  const tripIds = [...new Set(bookings.map((b) => b.tripId))];
-  const trips   = await prisma.trip.findMany({
-    where:  { id: { in: tripIds } },
-    select: { id: true, departureTime: true, boat: { select: { name: true } } },
+  // Single query: bookings with their trip included for departureTime ordering.
+  const bookings = await prisma.groupBooking.findMany({
+    where:   { companyId: session.user.companyId, employerId: session.user.employerId },
+    include: { trip: { select: { departureTime: true, boat: { select: { name: true } } } } },
+    orderBy: { createdAt: "desc" },
   });
-  const tripMap = new Map(trips.map((t) => [t.id, t]));
+
+  const now = new Date();
+
+  // Separate into upcoming (departureTime > now) and past, capped at 20 for history.
+  const proximas = bookings
+    .filter((b) => b.trip && b.trip.departureTime > now)
+    .sort((a, b) => a.trip!.departureTime.getTime() - b.trip!.departureTime.getTime());
+
+  const historial = bookings
+    .filter((b) => !b.trip || b.trip.departureTime <= now)
+    .sort((a, b) => (b.trip?.departureTime.getTime() ?? 0) - (a.trip?.departureTime.getTime() ?? 0))
+    .slice(0, 20);
+
+  function formatDeparture(d: Date) {
+    return d.toLocaleString("es-AR", {
+      timeZone: "America/Argentina/Buenos_Aires",
+      weekday:  "short",
+      day:      "numeric",
+      month:    "short",
+      hour:     "2-digit",
+      minute:   "2-digit",
+    });
+  }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-10 space-y-6">
+    <main className="mx-auto max-w-4xl px-4 py-10 space-y-8">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Mis reservas grupales</h1>
@@ -60,47 +76,80 @@ export default async function MisReservas() {
         </Link>
       </div>
 
-      {bookings.length === 0 ? (
+      {/* Próximas reservas */}
+      {proximas.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Próximas ({proximas.length})
+          </h2>
+          <ul className="space-y-3">
+            {proximas.map((booking) => {
+              const cfg       = STATUS_LABELS[booking.status] ?? STATUS_LABELS_DEFAULT;
+              const departure = booking.trip ? formatDeparture(booking.trip.departureTime) : "—";
+              return (
+                <li key={booking.id}>
+                  <Link
+                    href={`/empresa/reservas/${booking.id}`}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 hover:shadow-md transition-shadow"
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-semibold truncate">{booking.trip?.boat.name ?? "Viaje"}</p>
+                      <p className="text-sm text-muted-foreground">{departure}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.color}`}>
+                        {cfg.label}
+                      </span>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {proximas.length === 0 && historial.length === 0 && (
         <div className="py-12 text-center text-sm text-muted-foreground">
           Todavía no creaste ninguna reserva.
         </div>
-      ) : (
-        <ul className="space-y-3">
-          {bookings.map((booking) => {
-            const trip = tripMap.get(booking.tripId);
-            const cfg  = STATUS_LABELS[booking.status] ?? STATUS_LABELS_DEFAULT;
-            const departure = trip
-              ? new Date(trip.departureTime).toLocaleString("es-AR", {
-                  timeZone: "America/Argentina/Buenos_Aires",
-                  weekday:  "short",
-                  day:      "numeric",
-                  month:    "short",
-                  hour:     "2-digit",
-                  minute:   "2-digit",
-                })
-              : "—";
+      )}
 
-            return (
-              <li key={booking.id}>
-                <Link
-                  href={`/empresa/reservas/${booking.id}`}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 hover:shadow-md transition-shadow"
-                >
-                  <div className="space-y-0.5 min-w-0">
-                    <p className="font-semibold truncate">{trip?.boat.name ?? "Viaje"}</p>
-                    <p className="text-sm text-muted-foreground">{departure}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.color}`}>
-                      {cfg.label}
-                    </span>
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      {/* Historial */}
+      {historial.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Historial (últimas {historial.length})
+          </h2>
+          <ul className="space-y-3">
+            {historial.map((booking) => {
+              const departure = booking.trip ? formatDeparture(booking.trip.departureTime) : "—";
+              return (
+                <li key={booking.id}>
+                  <Link
+                    href={`/empresa/reservas/${booking.id}`}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/30 p-5 opacity-70 hover:opacity-90 transition-opacity"
+                  >
+                    <div className="space-y-0.5 min-w-0">
+                      <p className="font-semibold truncate text-muted-foreground">
+                        {booking.trip?.boat.name ?? "Viaje"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{departure}</p>
+                      <p className="text-xs text-muted-foreground/70">Este viaje ya pasó</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-500">
+                        Viaje finalizado
+                      </span>
+                      <ChevronRight className="size-4 text-muted-foreground/50" />
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
     </main>
   );
