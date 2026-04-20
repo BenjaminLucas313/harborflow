@@ -11,9 +11,9 @@ import type { NextAuthConfig } from "next-auth";
 import type { UserRole } from "@prisma/client";
 
 export const authConfig = {
-  // Providers are added in auth.ts (server-only). Edge middleware needs an
-  // empty array here so the type is satisfied without importing Node.js deps.
   providers: [],
+
+  secret: process.env.AUTH_SECRET,
 
   session: { strategy: "jwt" },
 
