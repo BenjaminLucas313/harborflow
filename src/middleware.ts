@@ -14,6 +14,7 @@ import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import {
   PUBLIC_ROUTES,
+  SHARED_AUTH_ROUTES,
   LOGIN_PATH,
   dashboardForRole,
   isAllowedPath,
@@ -70,6 +71,12 @@ export default auth((req) => {
     dest.search   = "";
     return NextResponse.redirect(dest);
   }
+
+  // Shared auth routes (e.g. /perfil) are accessible to any authenticated role.
+  const isShared = SHARED_AUTH_ROUTES.some(
+    (r) => pathname === r || pathname.startsWith(r + "/"),
+  );
+  if (isShared) return NextResponse.next();
 
   // Protected route that doesn't belong to this role → redirect to own dashboard.
   if (!isAllowedPath(role, pathname)) {

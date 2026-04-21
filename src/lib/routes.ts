@@ -7,6 +7,9 @@ import type { UserRole } from "@prisma/client";
 /** Routes that are always reachable without authentication. */
 export const PUBLIC_ROUTES: string[] = ["/", "/login", "/register"];
 
+/** Routes reachable by any authenticated user, regardless of role. */
+export const SHARED_AUTH_ROUTES: string[] = ["/perfil"];
+
 /** The fallback path when an unauthenticated user hits a protected route. */
 export const LOGIN_PATH = "/login";
 

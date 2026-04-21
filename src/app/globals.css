@@ -216,6 +216,11 @@
 .btn-vibrate { animation: btn-vibrate .4s ease-in-out; }
 .btn-pop     { animation: btn-pop     .3s ease-in-out; }
 
+@keyframes navDropIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
 /* ── Reduced-motion overrides ───────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .badge-bounce, .bell-shake, .btn-vibrate, .btn-pop,

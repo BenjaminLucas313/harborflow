@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { LoadingProvider } from "@/components/ui/LoadingProvider";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -25,11 +26,13 @@ export default async function RootLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} className={inter.variable}>
+    <html lang={locale} className={inter.variable} suppressHydrationWarning>
       <body className="antialiased">
-        <NextIntlClientProvider messages={messages}>
-          <LoadingProvider>{children}</LoadingProvider>
-        </NextIntlClientProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
+          <NextIntlClientProvider messages={messages}>
+            <LoadingProvider>{children}</LoadingProvider>
+          </NextIntlClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
