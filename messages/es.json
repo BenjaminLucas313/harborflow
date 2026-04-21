@@ -1,0 +1,215 @@
+{
+  "auth": {
+    "logout": {
+      "signOut": "Cerrar sesión",
+      "signingOut": "Cerrando sesión…"
+    },
+    "login": {
+      "metaTitle": "Iniciar sesión — HarborFlow",
+      "pageTitle": "Iniciar sesión en HarborFlow",
+      "pageSubtitle": "Ingresa tu organización, correo y contraseña para continuar.",
+      "fields": {
+        "organisation": "Organización",
+        "email": "Correo electrónico",
+        "password": "Contraseña"
+      },
+      "placeholders": {
+        "organisation": "tu-organización",
+        "email": "tu@correo.com"
+      },
+      "actions": {
+        "submit": "Iniciar sesión",
+        "submitting": "Iniciando sesión…"
+      },
+      "errors": {
+        "invalidCredentials": "Credenciales inválidas. Verifica tu organización, correo y contraseña.",
+        "companyNotFound": "Organización no encontrada. Verificá el identificador e intentá de nuevo.",
+        "userNotFound": "No existe una cuenta con ese correo en esta organización.",
+        "wrongPassword": "Contraseña incorrecta."
+      }
+    },
+    "register": {
+      "metaTitle": "Crear cuenta — HarborFlow",
+      "pageTitle": "Crea tu cuenta",
+      "pageSubtitle": "Regístrate como pasajero para comenzar a reservar viajes.",
+      "fields": {
+        "organisation": "Organización",
+        "firstName": "Nombre",
+        "lastName": "Apellido",
+        "email": "Correo electrónico",
+        "password": "Contraseña"
+      },
+      "placeholders": {
+        "organisation": "tu-organización",
+        "firstName": "Juan",
+        "lastName": "Pérez",
+        "email": "tu@correo.com"
+      },
+      "actions": {
+        "submit": "Crear cuenta",
+        "submitting": "Creando cuenta…"
+      },
+      "errors": {
+        "emailAlreadyRegistered": "Este correo ya está registrado en esta organización.",
+        "companyNotFound": "Organización no encontrada. Verifica el identificador e intenta de nuevo.",
+        "unexpected": "Algo salió mal. Por favor, inténtalo de nuevo."
+      },
+      "footer": {
+        "hasAccount": "¿Ya tienes una cuenta?",
+        "signIn": "Iniciar sesión"
+      }
+    }
+  },
+  "reservations": {
+    "trips": {
+      "metaTitle": "Viajes disponibles — HarborFlow",
+      "pageTitle": "Viajes disponibles",
+      "empty": "No hay viajes disponibles en este momento.",
+      "capacity": "asientos",
+      "waitlistAvailable": "Lista de espera disponible",
+      "full": "Lleno"
+    },
+    "myReservations": {
+      "metaTitle": "Mis reservas — HarborFlow",
+      "pageTitle": "Mis reservas",
+      "empty": "No tienes reservas activas.",
+      "departure": "Salida",
+      "boat": "Embarcación",
+      "status": "Estado",
+      "waitlistPosition": "Posición #{position} en lista de espera"
+    },
+    "manifest": {
+      "metaTitle": "Manifiesto — HarborFlow",
+      "pageTitle": "Manifiesto del viaje",
+      "empty": "No hay pasajeros reservados para este viaje.",
+      "passenger": "Pasajero",
+      "status": "Estado",
+      "position": "Pos."
+    },
+    "actions": {
+      "reserve": "Reservar",
+      "reserving": "Reservando…",
+      "joinWaitlist": "Unirse a lista",
+      "joining": "Uniéndose…"
+    },
+    "status": {
+      "CONFIRMED": "Confirmado",
+      "WAITLISTED": "Lista de espera",
+      "CHECKED_IN": "Embarcado",
+      "REPLACED": "Reemplazado",
+      "CANCELLED": "Cancelado",
+      "NO_SHOW": "No se presentó"
+    },
+    "errors": {
+      "alreadyReserved": "Ya tienes una reserva activa. Cancélala antes de reservar otro viaje.",
+      "tripNotBookable": "Este viaje ya no acepta reservas.",
+      "unexpected": "Algo salió mal. Por favor, inténtalo de nuevo."
+    },
+    "cancel": {
+      "cancelReservation": "Cancelar reserva",
+      "leaveWaitlist": "Salir de lista",
+      "cancelling": "Cancelando…",
+      "unexpected": "No se pudo cancelar. Por favor, inténtalo de nuevo."
+    }
+  },
+  "trips": {
+    "metaTitle": "Viajes — HarborFlow",
+    "pageTitle": "Viajes",
+    "createTrip": "Nuevo viaje",
+    "noBranchAssigned": "Tu cuenta no tiene una rama asignada. Contacta al administrador del sistema.",
+    "empty": "No hay viajes programados para esta rama.",
+    "list": {
+      "departure": "Salida",
+      "arrival": "Llegada est.",
+      "boat": "Embarcación",
+      "driver": "Capitán",
+      "capacity": "Capacidad",
+      "status": "Estado",
+      "noDriver": "Sin asignar"
+    },
+    "status": {
+      "SCHEDULED": "Programado",
+      "BOARDING": "Embarcando",
+      "DELAYED": "Demorado",
+      "CANCELLED": "Cancelado",
+      "DEPARTED": "Zarpó",
+      "COMPLETED": "Completado"
+    },
+    "form": {
+      "title": "Crear viaje",
+      "fields": {
+        "boat": "Embarcación",
+        "driver": "Capitán (opcional)",
+        "departureTime": "Hora de salida",
+        "estimatedArrivalTime": "Llegada estimada (opcional)",
+        "waitlistEnabled": "Habilitar lista de espera",
+        "notes": "Notas (opcional)"
+      },
+      "placeholders": {
+        "selectBoat": "Selecciona una embarcación",
+        "selectDriver": "Sin capitán asignado",
+        "notes": "Observaciones operativas…"
+      },
+      "actions": {
+        "submit": "Crear viaje",
+        "submitting": "Creando…",
+        "cancel": "Cancelar"
+      },
+      "errors": {
+        "unexpected": "Algo salió mal. Por favor, inténtalo de nuevo.",
+        "noBoats": "No hay embarcaciones activas en esta rama. Registra una embarcación antes de crear viajes."
+      }
+    }
+  },
+  "admin": {
+    "trips": {
+      "metaTitle": "Viajes — Admin — HarborFlow",
+      "pageTitle": "Viajes",
+      "createTrip": "Nuevo viaje",
+      "noBranchAssigned": "Tu cuenta no tiene una rama asignada. Contacta al administrador del sistema.",
+      "empty": "No hay viajes programados para esta rama.",
+      "list": {
+        "departure": "Salida",
+        "arrival": "Llegada est.",
+        "boat": "Embarcación",
+        "driver": "Capitán",
+        "capacity": "Capacidad",
+        "status": "Estado",
+        "noDriver": "Sin asignar"
+      },
+      "status": {
+        "SCHEDULED": "Programado",
+        "BOARDING": "Embarcando",
+        "DELAYED": "Demorado",
+        "CANCELLED": "Cancelado",
+        "DEPARTED": "Zarpó",
+        "COMPLETED": "Completado"
+      },
+      "form": {
+        "title": "Crear viaje",
+        "fields": {
+          "boat": "Embarcación",
+          "driver": "Capitán (opcional)",
+          "departureTime": "Hora de salida",
+          "estimatedArrivalTime": "Llegada estimada (opcional)",
+          "waitlistEnabled": "Habilitar lista de espera",
+          "notes": "Notas (opcional)"
+        },
+        "placeholders": {
+          "selectBoat": "Selecciona una embarcación",
+          "selectDriver": "Sin capitán asignado",
+          "notes": "Observaciones operativas…"
+        },
+        "actions": {
+          "submit": "Crear viaje",
+          "submitting": "Creando…",
+          "cancel": "Cancelar"
+        },
+        "errors": {
+          "unexpected": "Algo salió mal. Por favor, inténtalo de nuevo.",
+          "noBoats": "No hay embarcaciones activas en esta rama. Registra una embarcación antes de crear viajes."
+        }
+      }
+    }
+  }
+}
