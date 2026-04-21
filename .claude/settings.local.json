@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python -m graphify . --no-viz)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npm test *)"
     ]
   }
 }

@@ -41,6 +41,12 @@
       "Bash(git push --force:*)"
     ]
   },
+  "mcpServers": {
+    "reactbits": {
+      "command": "npx",
+      "args": ["reactbits-dev-mcp-server"]
+    }
+  },
   "hooks": {
     "PreToolUse": [
       {

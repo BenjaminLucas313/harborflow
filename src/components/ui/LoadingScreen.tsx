@@ -1,134 +1,113 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Anchor } from "lucide-react";
+import dynamic from "next/dynamic";
 
-// Deterministic pseudorandom — avoids hydration mismatch from Math.random()
-function pr(seed: number): number {
-  const x = Math.sin(seed) * 10_000;
-  return x - Math.floor(x);
-}
+const MagicRings = dynamic(() => import("./MagicRings"), { ssr: false });
 
-const STARS = Array.from({ length: 55 }, (_, i) => ({
-  left:    pr(i * 3 + 11) * 100,
-  top:     pr(i * 3 + 22) * 85,
-  size:    pr(i * 3 + 33) * 2 + 1,
-  opacity: pr(i * 5 + 7)  * 0.55 + 0.2,
-  dur:     pr(i * 7 + 13) * 2   + 1.5,
-  delay:   pr(i * 7 + 19) * 3,
-}));
+type Star = {
+  left: number;
+  top: number;
+  width: number;
+  opacity: number;
+  duration: number;
+  delay: number;
+};
 
 const DOT_DELAYS = ["0s", "0.16s", "0.32s", "0.48s", "0.64s"];
 
 export function LoadingScreen() {
+  const [stars, setStars] = useState<Star[]>([]);
+
+  useEffect(() => {
+    setStars(
+      Array.from({ length: 55 }, () => ({
+        left:     Math.random() * 100,
+        top:      Math.random() * 100,
+        width:    Math.random() * 1.8 + 0.3,
+        opacity:  Math.random() * 0.6 + 0.1,
+        duration: 2 + Math.random() * 4,
+        delay:    Math.random() * 4,
+      }))
+    );
+  }, []);
+
   return (
     <div
-      className="fixed inset-0 z-[9999] overflow-hidden select-none"
+      className="fixed inset-0 z-9999 overflow-hidden select-none"
       style={{ background: "radial-gradient(ellipse at 50% 45%, #0e2147 0%, #070f1f 70%)" }}
       role="status"
       aria-label="Cargando HarborFlow"
     >
-      {/* Stars */}
-      {STARS.map((s, i) => (
+      {/* MagicRings — z:1 */}
+      <div className="absolute inset-0" style={{ zIndex: 1 }}>
+        <MagicRings
+          color="#201ca7"
+          colorTwo="#6366F1"
+          ringCount={6}
+          speed={1}
+          attenuation={10}
+          lineThickness={2}
+          baseRadius={0.35}
+          radiusStep={0.1}
+          scaleRate={0.1}
+          opacity={1}
+          blur={0}
+          noiseAmount={0.1}
+          rotation={0}
+          ringGap={1.5}
+          fadeIn={0.7}
+          fadeOut={0.5}
+          followMouse={false}
+        />
+      </div>
+
+      {/* Stars — z:2 */}
+      {stars.map((s, i) => (
         <span
           key={i}
           className="absolute rounded-full bg-white pointer-events-none"
           style={{
-            left:    `${s.left}%`,
-            top:     `${s.top}%`,
-            width:   `${s.size}px`,
-            height:  `${s.size}px`,
-            opacity: s.opacity,
-            animation: `twinkle ${s.dur}s ${s.delay}s ease-in-out infinite`,
+            zIndex:    2,
+            left:      `${s.left}%`,
+            top:       `${s.top}%`,
+            width:     `${s.width}px`,
+            height:    `${s.width}px`,
+            opacity:   s.opacity,
+            animation: `twinkle ${s.duration}s ${s.delay}s ease-in-out infinite`,
           }}
           aria-hidden="true"
         />
       ))}
 
-      {/* Center cluster */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-5">
-
-        {/* Ring + anchor */}
+      {/* Center content — z:10 */}
+      <div
+        className="absolute inset-0 flex flex-col items-center justify-center gap-4"
+        style={{ zIndex: 10 }}
+      >
+        {/* Floating anchor */}
         <div
-          className="relative flex items-center justify-center"
-          style={{ width: 120, height: 120 }}
+          className="flex items-center justify-center rounded-full"
+          style={{
+            width:      80,
+            height:     80,
+            background: "rgba(255,255,255,0.05)",
+            border:     "1px solid rgba(255,255,255,0.1)",
+            animation:  "anchor-float 3s ease-in-out infinite",
+          }}
         >
-          {/* Glow halo */}
-          <div
-            className="absolute rounded-full pointer-events-none"
-            style={{
-              width:  88,
-              height: 88,
-              background: "radial-gradient(circle, rgba(37,99,189,0.55) 0%, transparent 68%)",
-              animation: "glow-pulse 2.6s ease-in-out infinite",
-            }}
-            aria-hidden="true"
-          />
-
-          {/* Spinning arc */}
-          <svg
-            width="112"
-            height="112"
-            viewBox="0 0 100 100"
-            className="absolute pointer-events-none"
-            style={{
-              animation: "rotate-dash 1.8s linear infinite",
-              transformOrigin: "50px 50px",
-            }}
-            aria-hidden="true"
-          >
-            <defs>
-              <linearGradient id="ls-arc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%"   stopColor="#1d4ed8" stopOpacity="0" />
-                <stop offset="50%"  stopColor="#3b82f6" stopOpacity="1" />
-                <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.6" />
-              </linearGradient>
-            </defs>
-            <circle
-              cx="50" cy="50" r="44"
-              fill="none"
-              stroke="url(#ls-arc-grad)"
-              strokeWidth="3"
-              strokeDasharray="60 220"
-              strokeLinecap="round"
-            />
-          </svg>
-
-          {/* Shine sweep */}
-          <div
-            className="absolute rounded-full overflow-hidden pointer-events-none"
-            style={{ width: 88, height: 88 }}
-            aria-hidden="true"
-          >
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "45%",
-                height: "100%",
-                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.14), transparent)",
-                animation: "shine-sweep 3s 1.2s ease-in-out infinite",
-              }}
-            />
-          </div>
-
-          {/* Anchor */}
-          <div
-            className="relative z-10"
-            style={{ animation: "anchor-float 3s ease-in-out infinite" }}
-          >
-            <Anchor
-              size={40}
-              strokeWidth={1.5}
-              className="text-white"
-              aria-hidden="true"
-            />
-          </div>
+          <Anchor size={38} strokeWidth={1.5} className="text-white" aria-hidden="true" />
         </div>
 
         {/* Brand name */}
         <p
-          className="text-white text-3xl font-bold tracking-tight"
-          style={{ animation: "loading-fade-up 500ms 200ms ease-out both" }}
+          className="font-bold tracking-tight"
+          style={{
+            fontSize:  21,
+            color:     "#f0f6ff",
+            animation: "loading-fade-up 500ms 200ms ease-out both",
+          }}
         >
           HarborFlow
         </p>
@@ -137,16 +116,37 @@ export function LoadingScreen() {
         <p
           className="text-[11px] font-semibold uppercase tracking-[0.22em]"
           style={{
-            color: "#90b8e0",
+            color:     "#90b8e0",
             animation: "loading-fade-up 500ms 380ms ease-out both",
           }}
         >
           Sistema portuario operativo
         </p>
 
+        {/* Progress bar */}
+        <div
+          className="rounded-full overflow-hidden"
+          style={{
+            width:      110,
+            height:     3,
+            background: "rgba(255,255,255,0.12)",
+            animation:  "loading-fade-up 500ms 440ms ease-out both",
+          }}
+          aria-hidden="true"
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              width:      "45%",
+              background: "linear-gradient(90deg, #3b82f6, #818cf8)",
+              animation:  "progress-bar 2s ease-in-out infinite",
+            }}
+          />
+        </div>
+
         {/* Sequential dots */}
         <div
-          className="flex gap-2 mt-1"
+          className="flex gap-2"
           style={{ animation: "loading-fade-up 500ms 520ms ease-out both" }}
           aria-hidden="true"
         >
@@ -155,9 +155,9 @@ export function LoadingScreen() {
               key={i}
               className="rounded-full bg-blue-400"
               style={{
-                width:  6,
-                height: 6,
-                display: "block",
+                width:     6,
+                height:    6,
+                display:   "block",
                 animation: `dot-seq 1.3s ${delay} ease-in-out infinite`,
               }}
             />
@@ -165,10 +165,10 @@ export function LoadingScreen() {
         </div>
       </div>
 
-      {/* Wave layers */}
+      {/* Wave layers — z:2 */}
       <div
         className="absolute bottom-0 left-0 right-0 pointer-events-none"
-        style={{ height: 90 }}
+        style={{ height: 90, zIndex: 2 }}
         aria-hidden="true"
       >
         <svg
@@ -176,9 +176,10 @@ export function LoadingScreen() {
           viewBox="0 0 1440 90"
           preserveAspectRatio="none"
           style={{
-            position: "absolute",
+            position:  "absolute",
             bottom: 0, left: 0,
-            width: "200%", height: "100%",
+            width:     "200%",
+            height:    "100%",
             animation: "wave-move 7s linear infinite",
           }}
         >
@@ -192,9 +193,10 @@ export function LoadingScreen() {
           viewBox="0 0 1440 90"
           preserveAspectRatio="none"
           style={{
-            position: "absolute",
+            position:  "absolute",
             bottom: 0, left: 0,
-            width: "200%", height: "100%",
+            width:     "200%",
+            height:    "100%",
             animation: "wave-move 10s linear infinite reverse",
           }}
         >

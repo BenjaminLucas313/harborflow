@@ -85,7 +85,7 @@ export function LoginForm() {
 
       {/* Organisation */}
       <div className="space-y-1.5">
-        <Label htmlFor="companySlug">{t("fields.organisation")}</Label>
+        <Label htmlFor="companySlug" className="text-white/75 font-medium text-[13px]">{t("fields.organisation")}</Label>
         <Input
           id="companySlug"
           type="text"
@@ -104,7 +104,7 @@ export function LoginForm() {
 
       {/* Email */}
       <div className="space-y-1.5">
-        <Label htmlFor="email">{t("fields.email")}</Label>
+        <Label htmlFor="email" className="text-white/75 font-medium text-[13px]">{t("fields.email")}</Label>
         <Input
           id="email"
           type="email"
@@ -123,7 +123,7 @@ export function LoginForm() {
 
       {/* Password */}
       <div className="space-y-1.5">
-        <Label htmlFor="password">{t("fields.password")}</Label>
+        <Label htmlFor="password" className="text-white/75 font-medium text-[13px]">{t("fields.password")}</Label>
         <Input
           id="password"
           type="password"

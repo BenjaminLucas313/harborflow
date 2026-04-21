@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer"],
   // react-markdown v10+ is ESM-only — transpile it through Next.js's webpack
   // pipeline so it works correctly in both server and client rendering contexts.
-  transpilePackages: ["react-markdown"],
+  transpilePackages: ["react-markdown", "three"],
 };
 
 export default withNextIntl(nextConfig);
