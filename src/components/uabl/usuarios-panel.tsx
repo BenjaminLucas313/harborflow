@@ -65,9 +65,10 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
   const [success,     setSuccess]     = useState<string | null>(null);
 
   // Delete state
-  const [deleteTarget,  setDeleteTarget]  = useState<UserRow | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError,   setDeleteError]   = useState<string | null>(null);
+  const [deleteTarget,   setDeleteTarget]   = useState<UserRow | null>(null);
+  const [deleteLoading,  setDeleteLoading]  = useState(false);
+  const [deleteError,    setDeleteError]    = useState<string | null>(null);
+  const [deleteSuccess,  setDeleteSuccess]  = useState<string | null>(null);
 
   const { className: vibrateClass, trigger: vibrateTrigger } = useVibrate();
 
@@ -142,12 +143,22 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
       return;
     }
 
+    const deletedName = `${deleteTarget.firstName} ${deleteTarget.lastName}`;
     setUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id));
     setDeleteTarget(null);
+    setDeleteSuccess(`Usuario ${deletedName} eliminado correctamente.`);
+    setTimeout(() => setDeleteSuccess(null), 3000);
   }
 
   return (
     <div className="space-y-6">
+      {/* ── Delete success banner ─────────────────────────────────────────── */}
+      {deleteSuccess && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 transition-opacity duration-300">
+          ✓ {deleteSuccess}
+        </div>
+      )}
+
       {/* ── Create button ─────────────────────────────────────────────────── */}
       <div className="flex justify-end">
         <button

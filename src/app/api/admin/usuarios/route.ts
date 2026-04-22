@@ -143,15 +143,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { email, firstName, lastName, role, branchId, departmentId, isUablAdmin } = parsed.data;
     const { companyId } = session.user;
 
-    // Check email uniqueness within company.
-    const existing = await prisma.user.findUnique({
-      where: { companyId_email: { companyId, email } },
-      select: { id: true },
+    // Find any existing user with this email (active or soft-deleted).
+    const existing = await prisma.user.findFirst({
+      where:  { companyId, email },
+      select: { id: true, isActive: true },
     });
 
-    if (existing) {
+    // Active user with same email → genuine conflict.
+    if (existing?.isActive) {
       return NextResponse.json(
-        { error: { code: "EMAIL_CONFLICT", message: "Ya existe un usuario con ese correo en esta organización." } },
+        { error: { code: "EMAIL_CONFLICT", message: "Ya existe un usuario activo con ese correo en esta organización." } },
         { status: 409 },
       );
     }
@@ -159,6 +160,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const tempPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
+    // Soft-deleted user → reactivate in place, preserving the original id and audit history.
+    if (existing && !existing.isActive) {
+      await prisma.user.updateMany({
+        where: { id: existing.id, companyId },
+        data: {
+          firstName,
+          lastName,
+          role,
+          passwordHash,
+          branchId:           branchId     || null,
+          departmentId:       departmentId || null,
+          isUablAdmin:        isUablAdmin  ?? false,
+          mustChangePassword: true,
+          isActive:           true,
+        },
+      });
+
+      await logAction({
+        companyId,
+        actorId:    session.user.id,
+        action:     "USER_CREATED",
+        entityType: "User",
+        entityId:   existing.id,
+        payload:    { email, role, reactivated: true },
+      });
+
+      sendBienvenida({ nombre: firstName, email, password: tempPassword, rol: role })
+        .catch((err) => console.error("[POST /api/admin/usuarios] sendBienvenida reactivation error:", err));
+
+      return NextResponse.json({ data: { id: existing.id, email } }, { status: 201 });
+    }
+
+    // No existing user → create fresh.
     const user = await prisma.user.create({
       data: {
         companyId,
@@ -167,9 +201,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         firstName,
         lastName,
         role,
-        branchId:          branchId     || null,
-        departmentId:      departmentId || null,
-        isUablAdmin:       isUablAdmin  ?? false,
+        branchId:           branchId     || null,
+        departmentId:       departmentId || null,
+        isUablAdmin:        isUablAdmin  ?? false,
         mustChangePassword: true,
       },
       select: { id: true, email: true, role: true, firstName: true },
@@ -184,9 +218,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       payload:    { email: user.email, role: user.role },
     });
 
-    // Best-effort — email failure must not roll back user creation.
-    // .catch() ensures any rejection that escapes sendBienvenida's own try/catch
-    // is still visible in the server console instead of being swallowed silently.
     console.log("[POST /api/admin/usuarios] triggering sendBienvenida for:", user.email);
     sendBienvenida({
       nombre:   user.firstName,
