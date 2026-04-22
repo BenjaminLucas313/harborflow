@@ -7,7 +7,9 @@
 // Business rules enforced:
 //   - Actor cannot delete themselves.
 //   - Target must belong to the same company (tenant isolation).
-//   - Future PENDING/CONFIRMED PassengerSlots are cancelled before soft-delete.
+//   - AuditLog is written FIRST inside the transaction — if it fails, the
+//     user is NOT deactivated and Postgres rolls back the entire operation.
+//   - Future PENDING/CONFIRMED PassengerSlots are cancelled in the same tx.
 //   - Soft-delete (isActive = false) preserves FK integrity for historical data.
 //
 // Response:
@@ -20,11 +22,11 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma }      from "@prisma/client";
 import { auth }        from "@/lib/auth";
 import { prisma }      from "@/lib/prisma";
 import { AppError }    from "@/lib/errors";
 import { assertRole }  from "@/lib/permissions";
-import { logAction }   from "@/modules/audit/repository";
 
 export async function DELETE(
   _req: NextRequest,
@@ -72,7 +74,26 @@ export async function DELETE(
     const now = new Date();
 
     await prisma.$transaction(async (tx) => {
-      // Cancel any future active slots assigned to this user.
+      // 1. Write audit log first — if this fails, nothing else runs and
+      //    Postgres rolls back, leaving the user active.
+      await tx.auditLog.create({
+        data: {
+          companyId:  session.user.companyId,
+          actorId:    session.user.id,
+          action:     "USER_DELETED",
+          entityType: "User",
+          entityId:   userId,
+          payload:    { email: target.email, role: target.role } as Prisma.InputJsonValue,
+        },
+      });
+
+      // 2. Soft-delete the user — companyId filter enforces tenant isolation.
+      await tx.user.updateMany({
+        where: { id: userId, companyId: session.user.companyId },
+        data:  { isActive: false },
+      });
+
+      // 3. Cancel any future active slots assigned to this user.
       await tx.passengerSlot.updateMany({
         where: {
           usuarioId: userId,
@@ -81,21 +102,6 @@ export async function DELETE(
         },
         data: { status: "CANCELLED" },
       });
-
-      // Soft-delete: revoke access without breaking FK references to historical data.
-      await tx.user.updateMany({
-        where: { id: userId, companyId: session.user.companyId },
-        data:  { isActive: false },
-      });
-    });
-
-    await logAction({
-      companyId:  session.user.companyId,
-      actorId:    session.user.id,
-      action:     "USER_DELETED",
-      entityType: "User",
-      entityId:   userId,
-      payload:    { email: target.email, role: target.role },
     });
 
     return NextResponse.json({ data: { id: userId } });
