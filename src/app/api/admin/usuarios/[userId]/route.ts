@@ -30,7 +30,7 @@ import { assertRole }  from "@/lib/permissions";
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { userId: string } },
+  { params }: { params: Promise<{ userId: string }> },
 ): Promise<NextResponse> {
   try {
     const session = await auth();
@@ -50,7 +50,7 @@ export async function DELETE(
       );
     }
 
-    const { userId } = params;
+    const { userId } = await params;
 
     if (userId === session.user.id) {
       return NextResponse.json(
