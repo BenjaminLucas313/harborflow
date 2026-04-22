@@ -165,6 +165,7 @@ enum AuditAction {
   USER_CREATED
   USER_ROLE_CHANGED
   USER_DEACTIVATED
+  USER_DELETED
   // ── V2: Group booking lifecycle ───────────────────────────────────────────
   GROUP_BOOKING_CREATED
   GROUP_BOOKING_SUBMITTED

@@ -1,35 +1,38 @@
 "use client";
 
-// UsuariosPanel — list of users + create user form for UABL admins.
+// UsuariosPanel — list of users + create/delete user actions for UABL admins.
 
 import { useState } from "react";
-import { Plus, UserCheck, UserX } from "lucide-react";
+import { Plus, Trash2, UserCheck, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useVibrate } from "@/hooks/useButtonAnimation";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type UserRow = {
-  id:          string;
-  email:       string;
-  firstName:   string;
-  lastName:    string;
-  role:        string;
-  isActive:    boolean;
-  isUablAdmin: boolean;
-  createdAt:   Date | string;
-  branch?:     { name: string } | null;
-  department?: { name: string } | null;
+  id:              string;
+  email:           string;
+  firstName:       string;
+  lastName:        string;
+  role:            string;
+  isActive:        boolean;
+  isUablAdmin:     boolean;
+  createdAt:       Date | string;
+  futureSlotCount: number;
+  branch?:         { name: string } | null;
+  department?:     { name: string } | null;
 };
 
 type Branch = { id: string; name: string };
 type Dept   = { id: string; name: string };
 
 type Props = {
-  users:       UserRow[];
-  branches:    Branch[];
-  departments: Dept[];
+  users:         UserRow[];
+  branches:      Branch[];
+  departments:   Dept[];
+  currentUserId: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -54,12 +57,19 @@ const ROLE_COLOR: Record<string, string> = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function UsuariosPanel({ users: initial, branches, departments }: Props) {
+export function UsuariosPanel({ users: initial, branches, departments, currentUserId }: Props) {
   const [users,       setUsers]       = useState<UserRow[]>(initial);
   const [showForm,    setShowForm]    = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState<string | null>(null);
   const [success,     setSuccess]     = useState<string | null>(null);
+
+  // Delete state
+  const [deleteTarget,  setDeleteTarget]  = useState<UserRow | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError,   setDeleteError]   = useState<string | null>(null);
+
+  const { className: vibrateClass, trigger: vibrateTrigger } = useVibrate();
 
   // Form state
   const [email,        setEmail]        = useState("");
@@ -70,7 +80,7 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
   const [departmentId, setDepartmentId] = useState("");
   const [isUablAdmin,  setIsUablAdmin]  = useState(false);
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
@@ -112,6 +122,28 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
     setEmail(""); setFirstName(""); setLastName("");
     setRole("UABL"); setBranchId(""); setDepartmentId(""); setIsUablAdmin(false);
     setShowForm(false);
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    vibrateTrigger();
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    const res = await fetch(`/api/admin/usuarios/${deleteTarget.id}`, {
+      method: "DELETE",
+    });
+
+    setDeleteLoading(false);
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: { message: string } };
+      setDeleteError(body.error?.message ?? "Error al eliminar el usuario.");
+      return;
+    }
+
+    setUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id));
+    setDeleteTarget(null);
   }
 
   return (
@@ -266,6 +298,7 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
                   <th className="px-4 py-3 text-left font-medium">Rol</th>
                   <th className="px-4 py-3 text-left font-medium">Puerto / Depto</th>
                   <th className="px-4 py-3 text-center font-medium">Estado</th>
+                  <th className="px-4 py-3 text-center font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -292,6 +325,22 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
                         : <UserX    className="size-4 text-red-500 mx-auto" />
                       }
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      {u.id === currentUserId ? (
+                        <span title="No podés eliminarte a vos mismo" className="inline-flex justify-center">
+                          <Trash2 className="size-4 text-muted-foreground/25 cursor-not-allowed" />
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setDeleteTarget(u); setDeleteError(null); }}
+                          className="rounded-lg p-1 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Eliminar usuario"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -299,6 +348,58 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
           </div>
         )}
       </div>
+
+      {/* ── Delete confirmation modal ──────────────────────────────────────── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl space-y-4">
+            <h3 className="text-base font-semibold">
+              ¿Eliminar a {deleteTarget.firstName} {deleteTarget.lastName}?
+            </h3>
+
+            {deleteTarget.futureSlotCount > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                Este usuario tiene{" "}
+                <strong>{deleteTarget.futureSlotCount}</strong>{" "}
+                {deleteTarget.futureSlotCount === 1 ? "asignación futura" : "asignaciones futuras"}.
+                Al eliminarlo quedarán canceladas automáticamente.
+              </div>
+            )}
+
+            <p className="text-sm text-muted-foreground">
+              Esta acción no se puede deshacer. El usuario perderá acceso inmediatamente.
+            </p>
+
+            {deleteError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {deleteError}
+              </p>
+            )}
+
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+                disabled={deleteLoading}
+                className="rounded-xl border border-input px-4 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className={cn(
+                  "rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors",
+                  vibrateClass,
+                )}
+              >
+                {deleteLoading ? "Eliminando…" : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   Container,
   Head,
   Html,
+  Img,
   Preview,
   Section,
   Text,
@@ -25,23 +26,13 @@ export function ResetPasswordEmail({ nombre, resetUrl }: ResetPasswordEmailProps
 
           {/* ── HEADER ───────────────────────────────────────────────────── */}
           <Section style={header}>
-            <div style={iconCircle}>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#7eb8f5"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="5" r="3" />
-                <line x1="12" y1="8" x2="12" y2="22" />
-                <path d="M5 15H2a10 10 0 0 0 20 0h-3" />
-              </svg>
-            </div>
+            <Img
+              src={`${process.env.NEXT_PUBLIC_APP_URL}/HarborLogo.png`}
+              width="32"
+              height="32"
+              alt="HarborFlow"
+              style={{ borderRadius: '50%' }}
+            />
             <span style={brandText}>HarborFlow</span>
           </Section>
 
@@ -109,18 +100,6 @@ const header: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "10px",
-};
-
-const iconCircle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: "40px",
-  height: "40px",
-  borderRadius: "50%",
-  backgroundColor: "#1a3560",
-  verticalAlign: "middle",
-  marginRight: "10px",
 };
 
 const brandText: React.CSSProperties = {

@@ -12,7 +12,9 @@ export default async function UablUsuarios() {
 
   const { companyId } = session.user;
 
-  const [users, branches, departments] = await Promise.all([
+  const now = new Date();
+
+  const [rawUsers, branches, departments] = await Promise.all([
     prisma.user.findMany({
       where:   { companyId },
       select: {
@@ -26,6 +28,16 @@ export default async function UablUsuarios() {
         createdAt:   true,
         branch:      { select: { name: true } },
         department:  { select: { name: true } },
+        _count: {
+          select: {
+            assignedSlots: {
+              where: {
+                status: { in: ["PENDING", "CONFIRMED"] },
+                trip:   { departureTime: { gt: now } },
+              },
+            },
+          },
+        },
       },
       orderBy: [{ role: "asc" }, { lastName: "asc" }],
     }),
@@ -40,6 +52,11 @@ export default async function UablUsuarios() {
       orderBy: { name: "asc" },
     }),
   ]);
+
+  const users = rawUsers.map(({ _count, ...u }) => ({
+    ...u,
+    futureSlotCount: _count.assignedSlots,
+  }));
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 space-y-8">
@@ -64,6 +81,7 @@ export default async function UablUsuarios() {
         users={users}
         branches={branches}
         departments={departments}
+        currentUserId={session.user.id}
       />
     </main>
   );
