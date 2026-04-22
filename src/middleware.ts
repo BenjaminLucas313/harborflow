@@ -72,6 +72,21 @@ export default auth((req) => {
     return NextResponse.redirect(dest);
   }
 
+  // mustChangePassword guard — redirect to /perfil to force password change.
+  // Only applies to page routes (API routes are excluded by the matcher).
+  // The /perfil route itself is allowed through so the user can actually change
+  // their password. Once they do, the client calls useSession().update() to
+  // clear the flag in the JWT without requiring a re-login.
+  if (
+    session.user.mustChangePassword &&
+    !pathname.startsWith("/perfil")
+  ) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = "/perfil";
+    dest.search   = "?tab=password&forced=true";
+    return NextResponse.redirect(dest);
+  }
+
   // Shared auth routes (e.g. /perfil) are accessible to any authenticated role.
   const isShared = SHARED_AUTH_ROUTES.some(
     (r) => pathname === r || pathname.startsWith(r + "/"),

@@ -5,7 +5,13 @@
 import type { UserRole } from "@prisma/client";
 
 /** Routes that are always reachable without authentication. */
-export const PUBLIC_ROUTES: string[] = ["/", "/login", "/register"];
+export const PUBLIC_ROUTES: string[] = [
+  "/",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+];
 
 /** Routes reachable by any authenticated user, regardless of role. */
 export const SHARED_AUTH_ROUTES: string[] = ["/perfil"];

@@ -63,7 +63,6 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
 
   // Form state
   const [email,        setEmail]        = useState("");
-  const [password,     setPassword]     = useState("");
   const [firstName,    setFirstName]    = useState("");
   const [lastName,     setLastName]     = useState("");
   const [role,         setRole]         = useState("UABL");
@@ -82,7 +81,6 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({
         email,
-        password,
         firstName,
         lastName,
         role,
@@ -111,7 +109,7 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
     }
 
     // Reset form
-    setEmail(""); setPassword(""); setFirstName(""); setLastName("");
+    setEmail(""); setFirstName(""); setLastName("");
     setRole("UABL"); setBranchId(""); setDepartmentId(""); setIsUablAdmin(false);
     setShowForm(false);
   }
@@ -163,13 +161,11 @@ export function UsuariosPanel({ users: initial, branches, departments }: Props) 
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Contraseña <span className="text-red-500">*</span></label>
-            <input
-              type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mínimo 8 caracteres"
-              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+          <div
+            className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-700"
+            style={{ fontSize: "13px" }}
+          >
+            Se generará una contraseña temporal y se enviará al correo del usuario.
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

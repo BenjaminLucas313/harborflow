@@ -20,17 +20,24 @@ export const authConfig = {
   callbacks: {
     // Stamp custom claims onto the token at login time.
     // `user` is only present on the first call (right after authorize returns).
-    jwt({ token, user }) {
+    // `trigger === "update"` fires when the client calls useSession().update(data),
+    // allowing server-side JWT refresh without re-authentication (e.g. after
+    // the user clears their mustChangePassword flag).
+    jwt({ token, user, trigger, session }) {
       if (user) {
-        token.companyId    = user.companyId;
-        token.branchId     = user.branchId ?? null;
-        token.firstName    = user.firstName;
-        token.lastName     = user.lastName;
-        token.role         = user.role;
+        token.companyId          = user.companyId;
+        token.branchId           = user.branchId ?? null;
+        token.firstName          = user.firstName;
+        token.lastName           = user.lastName;
+        token.role               = user.role;
         // V2 additions
-        token.departmentId = user.departmentId ?? null;
-        token.employerId   = user.employerId ?? null;
-        token.isUablAdmin  = user.isUablAdmin ?? false;
+        token.departmentId       = user.departmentId ?? null;
+        token.employerId         = user.employerId ?? null;
+        token.isUablAdmin        = user.isUablAdmin ?? false;
+        token.mustChangePassword = user.mustChangePassword ?? false;
+      }
+      if (trigger === "update" && typeof (session as { mustChangePassword?: boolean })?.mustChangePassword === "boolean") {
+        token.mustChangePassword = (session as { mustChangePassword: boolean }).mustChangePassword;
       }
       return token;
     },
@@ -38,16 +45,17 @@ export const authConfig = {
     // Project token claims into the session object available to the app.
     // token.sub is the user.id set automatically by Auth.js.
     session({ session, token }) {
-      session.user.id           = token.sub!;
-      session.user.companyId    = token.companyId as string;
-      session.user.branchId     = token.branchId as string | null;
-      session.user.firstName    = token.firstName as string;
-      session.user.lastName     = token.lastName as string;
-      session.user.role         = token.role as UserRole;
+      session.user.id                = token.sub!;
+      session.user.companyId         = token.companyId as string;
+      session.user.branchId          = token.branchId as string | null;
+      session.user.firstName         = token.firstName as string;
+      session.user.lastName          = token.lastName as string;
+      session.user.role              = token.role as UserRole;
       // V2 additions
-      session.user.departmentId = token.departmentId as string | null;
-      session.user.employerId   = token.employerId as string | null;
-      session.user.isUablAdmin  = token.isUablAdmin as boolean;
+      session.user.departmentId      = token.departmentId as string | null;
+      session.user.employerId        = token.employerId as string | null;
+      session.user.isUablAdmin       = token.isUablAdmin as boolean;
+      session.user.mustChangePassword = token.mustChangePassword as boolean;
       return session;
     },
   },

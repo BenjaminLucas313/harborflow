@@ -21,12 +21,20 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt                        from "bcryptjs";
+import { randomBytes }               from "crypto";
 import { z }                         from "zod";
 import { auth }                      from "@/lib/auth";
 import { prisma }                    from "@/lib/prisma";
 import { AppError }                  from "@/lib/errors";
 import { assertRole }                from "@/lib/permissions";
 import { logAction }                 from "@/modules/audit/repository";
+import { sendBienvenida }            from "@/services/email.service";
+
+function generateTempPassword(): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = randomBytes(8);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join("");
+}
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -34,7 +42,6 @@ import { logAction }                 from "@/modules/audit/repository";
 
 const CreateUserSchema = z.object({
   email:        z.string().email(),
-  password:     z.string().min(8, "La contraseña debe tener al menos 8 caracteres."),
   firstName:    z.string().min(1),
   lastName:     z.string().min(1),
   role:         z.enum(["UABL", "PROVEEDOR", "EMPRESA", "USUARIO"]),
@@ -133,7 +140,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { email, password, firstName, lastName, role, branchId, departmentId, isUablAdmin } = parsed.data;
+    const { email, firstName, lastName, role, branchId, departmentId, isUablAdmin } = parsed.data;
     const { companyId } = session.user;
 
     // Check email uniqueness within company.
@@ -149,7 +156,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const tempPassword = generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
 
     const user = await prisma.user.create({
       data: {
@@ -159,11 +167,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         firstName,
         lastName,
         role,
-        branchId:     branchId     || null,
-        departmentId: departmentId || null,
-        isUablAdmin:  isUablAdmin  ?? false,
+        branchId:          branchId     || null,
+        departmentId:      departmentId || null,
+        isUablAdmin:       isUablAdmin  ?? false,
+        mustChangePassword: true,
       },
-      select: { id: true, email: true, role: true },
+      select: { id: true, email: true, role: true, firstName: true },
     });
 
     await logAction({
@@ -174,6 +183,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       entityId:   user.id,
       payload:    { email: user.email, role: user.role },
     });
+
+    // Best-effort — email failure must not roll back user creation.
+    // .catch() ensures any rejection that escapes sendBienvenida's own try/catch
+    // is still visible in the server console instead of being swallowed silently.
+    console.log("[POST /api/admin/usuarios] triggering sendBienvenida for:", user.email);
+    sendBienvenida({
+      nombre:   user.firstName,
+      email:    user.email,
+      password: tempPassword,
+      rol:      user.role,
+    }).catch((err) =>
+      console.error("[POST /api/admin/usuarios] sendBienvenida uncaught rejection:", err),
+    );
 
     return NextResponse.json({ data: { id: user.id, email: user.email } }, { status: 201 });
   } catch (err) {

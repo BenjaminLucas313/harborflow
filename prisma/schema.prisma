@@ -349,6 +349,8 @@ model User {
   employerId   String?
   /// For UABL role: if true, can manage departments and work types (admin sub-role).
   isUablAdmin  Boolean  @default(false)
+  /// If true, user must change password on next login (set for newly-created accounts).
+  mustChangePassword Boolean @default(false)
 
   company    Company     @relation(fields: [companyId], references: [id])
   branch     Branch?     @relation(fields: [branchId], references: [id])
@@ -376,6 +378,7 @@ model User {
   tripRequestsReviewed  TripRequest[]   @relation("TripRequestReviewer")
 
   notificaciones        Notificacion[]
+  passwordResetTokens   PasswordResetToken[]
 
   @@unique([companyId, email])
   @@index([companyId, role])
@@ -1199,4 +1202,24 @@ model Notificacion {
 
   @@index([userId, leida])
   @@index([userId, createdAt])
+}
+
+// =============================================================================
+// PASSWORD RESET TOKEN
+// =============================================================================
+
+/// One-time token for password reset flows. Created by POST /api/auth/forgot-password,
+/// consumed (and marked used) by POST /api/auth/reset-password.
+/// Tokens expire after 1 hour and are single-use.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }

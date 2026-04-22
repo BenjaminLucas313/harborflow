@@ -21,6 +21,8 @@ declare module "next-auth" {
       employerId: string | null;
       /** For UABL users: if true, can manage departments and work types. */
       isUablAdmin: boolean;
+      /** If true, user must change password before accessing any other route. */
+      mustChangePassword: boolean;
     } & DefaultSession["user"];
   }
 
@@ -35,6 +37,7 @@ declare module "next-auth" {
     departmentId: string | null;
     employerId: string | null;
     isUablAdmin: boolean;
+    mustChangePassword: boolean;
   }
 }
 
@@ -50,5 +53,6 @@ declare module "next-auth/jwt" {
     departmentId: string | null;
     employerId: string | null;
     isUablAdmin: boolean;
+    mustChangePassword: boolean;
   }
 }

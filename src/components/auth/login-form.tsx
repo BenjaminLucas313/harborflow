@@ -150,6 +150,16 @@ export function LoginForm() {
           t("actions.submit")
         )}
       </Button>
+
+      {/* Forgot password */}
+      <div className="text-center">
+        <a
+          href="/forgot-password"
+          className="text-sm text-white/50 hover:text-white/80 transition-colors"
+        >
+          ¿Olvidaste tu contraseña?
+        </a>
+      </div>
     </form>
   );
 }

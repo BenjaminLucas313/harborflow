@@ -60,6 +60,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             departmentId: true,
             employerId: true,
             isUablAdmin: true,
+            mustChangePassword: true,
           },
         });
         if (!user?.isActive) return null;
@@ -85,6 +86,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           departmentId: user.departmentId,
           employerId: user.employerId,
           isUablAdmin: user.isUablAdmin,
+          mustChangePassword: user.mustChangePassword,
         };
       },
     }),

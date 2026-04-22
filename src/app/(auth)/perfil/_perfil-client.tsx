@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useTheme } from "next-themes";
-import { Sun, Moon, Save, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useState }            from "react";
+import { useTheme }            from "next-themes";
+import { useSession }          from "next-auth/react";
+import { Sun, Moon, Save, Eye, EyeOff, Loader2, AlertTriangle } from "lucide-react";
+import { dashboardForRole }    from "@/lib/routes";
 
 // ---------------------------------------------------------------------------
 // Role colours (mirrors nav-user-menu.tsx)
@@ -50,14 +52,37 @@ type Tab = "info" | "password" | "apariencia";
 export function PerfilClient({
   user,
   defaultTab,
+  forced = false,
 }: {
   user: User;
   defaultTab: "info" | "password";
+  forced?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8 space-y-6">
+      {/* ── Forced password change banner ───────────────────────────────── */}
+      {forced && (
+        <div
+          role="alert"
+          style={{
+            background:   "#fef3c7",
+            border:       "1px solid #fcd34d",
+            borderRadius: "10px",
+            padding:      "12px 16px",
+            display:      "flex",
+            alignItems:   "flex-start",
+            gap:          "10px",
+          }}
+        >
+          <AlertTriangle size={18} style={{ color: "#92400e", flexShrink: 0, marginTop: "1px" }} aria-hidden="true" />
+          <p style={{ color: "#92400e", fontSize: "14px", margin: 0, lineHeight: "1.5" }}>
+            <strong>Debés cambiar tu contraseña</strong> antes de continuar usando el sistema.
+          </p>
+        </div>
+      )}
+
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <ProfileHeader user={user} />
 
@@ -66,7 +91,7 @@ export function PerfilClient({
 
       {/* ── Sections ────────────────────────────────────────────────────── */}
       {activeTab === "info"       && <InfoSection user={user} />}
-      {activeTab === "password"   && <PasswordSection />}
+      {activeTab === "password"   && <PasswordSection forced={forced} userRole={user.role} />}
       {activeTab === "apariencia" && <AppearanceSection />}
     </main>
   );
@@ -241,7 +266,8 @@ function InfoSection({ user }: { user: User }) {
 // Section: Contraseña
 // ---------------------------------------------------------------------------
 
-function PasswordSection() {
+function PasswordSection({ forced = false, userRole }: { forced?: boolean; userRole: string }) {
+  const { update }             = useSession();
   const [current,  setCurrent]  = useState("");
   const [next,     setNext]     = useState("");
   const [confirm,  setConfirm]  = useState("");
@@ -250,7 +276,7 @@ function PasswordSection() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNext,    setShowNext]    = useState(false);
 
-  const mismatch    = confirm.length > 0 && next !== confirm;
+  const mismatch      = confirm.length > 0 && next !== confirm;
   const sameAsCurrent = next.length > 0 && next === current;
 
   async function handleSubmit(e: React.SyntheticEvent) {
@@ -278,6 +304,13 @@ function PasswordSection() {
       } else {
         setFeedback({ type: "ok", msg: "Contraseña actualizada correctamente" });
         setCurrent(""); setNext(""); setConfirm("");
+
+        if (forced) {
+          // Refresh the JWT so the middleware mustChangePassword guard clears,
+          // then navigate to the role dashboard without a full re-login.
+          await update({ mustChangePassword: false });
+          window.location.replace(dashboardForRole(userRole as Parameters<typeof dashboardForRole>[0]));
+        }
       }
     } catch {
       setFeedback({ type: "error", msg: "Error de conexión" });
