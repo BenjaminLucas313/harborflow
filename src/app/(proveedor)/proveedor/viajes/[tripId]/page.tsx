@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TripStatusManager } from "@/components/proveedor/trip-status-manager";
+import { ConductorSelector } from "@/components/proveedor/conductor-selector";
+import type { ConductorOption } from "@/components/proveedor/conductor-selector";
 
 const STATUS_LABEL: Record<string, string> = {
   SCHEDULED: "Programado",
@@ -44,7 +46,8 @@ export default async function ProveedorTripDetail({
 
   const { tripId } = await params;
 
-  const trip = await prisma.trip.findFirst({
+  const [trip, driversRaw] = await Promise.all([
+  prisma.trip.findFirst({
     where:  { id: tripId, companyId: session.user.companyId },
     select: {
       id:                   true,
@@ -54,6 +57,7 @@ export default async function ProveedorTripDetail({
       capacity:             true,
       notes:                true,
       automatizado:         true,
+      driverId:             true,
       boat:    { select: { name: true } },
       branch:  { select: { name: true } },
       driver:  { select: { firstName: true, lastName: true } },
@@ -69,9 +73,22 @@ export default async function ProveedorTripDetail({
         orderBy: { createdAt: "asc" },
       },
     },
-  });
+  }),
+  prisma.driver.findMany({
+    where:   { companyId: session.user.companyId, isActive: true },
+    select:  { id: true, firstName: true, lastName: true, userId: true },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+  }),
+  ]);
 
   if (!trip) notFound();
+
+  const drivers: ConductorOption[] = driversRaw.map((d) => ({
+    id:        d.id,
+    firstName: d.firstName,
+    lastName:  d.lastName,
+    hasUser:   d.userId !== null,
+  }));
 
   const dep = new Date(trip.departureTime).toLocaleString("es-AR", {
     timeZone: "America/Argentina/Buenos_Aires",
@@ -156,6 +173,16 @@ export default async function ProveedorTripDetail({
             <span className="font-medium">Notas: </span>{trip.notes}
           </div>
         )}
+      </div>
+
+      {/* Conductor assignment */}
+      <div className="space-y-2">
+        <h2 className="font-semibold text-sm">Conductor asignado</h2>
+        <ConductorSelector
+          tripId={trip.id}
+          currentDriverId={trip.driverId ?? null}
+          drivers={drivers}
+        />
       </div>
 
       {/* Status manager */}

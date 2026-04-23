@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCw, User } from "lucide-react";
 import { DayDivider } from "@/components/ui/DayDivider";
 import { cn } from "@/lib/utils";
 
@@ -20,14 +20,15 @@ import { cn } from "@/lib/utils";
 // ---------------------------------------------------------------------------
 
 export type TripItem = {
-  id:            string;
-  departureTime: Date | string;
-  status:        string;
-  capacity:      number;
-  occupancy:     number;   // pre-computed slot count passed from server
-  boatName:      string;
-  branchName:    string;
-  automatizado?: boolean;
+  id:             string;
+  departureTime:  Date | string;
+  status:         string;
+  capacity:       number;
+  occupancy:      number;   // pre-computed slot count passed from server
+  boatName:       string;
+  branchName:     string;
+  automatizado?:  boolean;
+  conductorName?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -163,6 +164,17 @@ function TripRow({ trip }: { trip: TripItem }) {
           <span title="Programado automáticamente" className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
             <RefreshCw className="size-3" aria-hidden="true" />
             Auto
+          </span>
+        )}
+        {trip.conductorName ? (
+          <span title={`Conductor: ${trip.conductorName}`} className="hidden sm:flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 max-w-30 truncate">
+            <User className="size-3 shrink-0" aria-hidden="true" />
+            {trip.conductorName}
+          </span>
+        ) : (
+          <span title="Sin conductor asignado" className="hidden sm:flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-400">
+            <User className="size-3 shrink-0" aria-hidden="true" />
+            Sin conductor
           </span>
         )}
         <span className="text-sm text-muted-foreground tabular-nums">

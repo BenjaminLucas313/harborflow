@@ -38,6 +38,7 @@ export default async function ProveedorViajes() {
         automatizado:  true,
         boat:          { select: { name: true } },
         branch:        { select: { name: true } },
+        driver:        { select: { firstName: true, lastName: true } },
         _count: {
           select: { passengerSlots: { where: { status: { in: ACTIVE_SLOT_STATUSES } } } },
         },
@@ -59,6 +60,7 @@ export default async function ProveedorViajes() {
         automatizado:  true,
         boat:          { select: { name: true } },
         branch:        { select: { name: true } },
+        driver:        { select: { firstName: true, lastName: true } },
         _count: {
           select: { passengerSlots: { where: { status: { in: ACTIVE_SLOT_STATUSES } } } },
         },
@@ -78,6 +80,9 @@ export default async function ProveedorViajes() {
       boatName:      t.boat.name,
       branchName:    t.branch.name,
       automatizado:  t.automatizado,
+      conductorName: t.driver
+        ? `${t.driver.firstName} ${t.driver.lastName}`
+        : undefined,
     };
   }
 

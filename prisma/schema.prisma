@@ -67,6 +67,7 @@ enum UserRole {
   EMPRESA
   UABL
   PROVEEDOR
+  CONDUCTOR
 }
 
 /// Operational lifecycle of a scheduled trip. Unchanged from V1.
@@ -381,6 +382,9 @@ model User {
   notificaciones        Notificacion[]
   passwordResetTokens   PasswordResetToken[]
 
+  /// For CONDUCTOR role: the Driver profile linked to this login account.
+  driver                Driver?
+
   @@unique([companyId, email])
   @@index([companyId, role])
   @@index([companyId, branchId])
@@ -650,6 +654,11 @@ model Driver {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  /// Optional link to a User account with role CONDUCTOR.
+  /// When set, this driver can log in and see their assigned trips.
+  userId  String?  @unique
+  user    User?    @relation(fields: [userId], references: [id])
 
   company Company @relation(fields: [companyId], references: [id])
   branch  Branch  @relation(fields: [branchId], references: [id])

@@ -32,6 +32,7 @@ export const ROLE_DASHBOARD: Record<UserRole, string> = {
   EMPRESA:   "/empresa",
   UABL:      "/uabl",
   PROVEEDOR: "/proveedor",
+  CONDUCTOR: "/conductor",
   // V1 legacy — safe fallback, these accounts should be remapped
   PASSENGER: "/",
   OPERATOR:  "/",

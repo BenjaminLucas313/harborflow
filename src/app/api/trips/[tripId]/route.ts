@@ -30,7 +30,11 @@ const DesautomatizarSchema = z.object({
   action: z.literal("DESAUTOMATIZAR"),
 });
 
-const BodySchema = z.union([StatusChangeSchema, DesautomatizarSchema]);
+const AssignDriverSchema = z.object({
+  driverId: z.string().nullable(),
+});
+
+const BodySchema = z.union([StatusChangeSchema, DesautomatizarSchema, AssignDriverSchema]);
 
 export async function PATCH(
   req: NextRequest,
@@ -87,6 +91,42 @@ export async function PATCH(
       { data: null, error: { code: "NOT_FOUND", message: "Viaje no encontrado." } },
       { status: 404 },
     );
+  }
+
+  // ── ASSIGN DRIVER ─────────────────────────────────────────────────────────────
+  if ("driverId" in parsed.data) {
+    const { driverId } = parsed.data;
+
+    // Verify driver belongs to this company (or allow null to unassign).
+    if (driverId !== null) {
+      const driverExists = await prisma.driver.findFirst({
+        where:  { id: driverId, companyId },
+        select: { id: true },
+      });
+      if (!driverExists) {
+        return NextResponse.json(
+          { data: null, error: { code: "NOT_FOUND", message: "Conductor no encontrado." } },
+          { status: 404 },
+        );
+      }
+    }
+
+    const updated = await prisma.trip.update({
+      where:  { id: tripId },
+      data:   { driverId },
+      select: { id: true, driverId: true },
+    });
+
+    logAction({
+      companyId,
+      actorId,
+      action:     "TRIP_STATUS_CHANGED",
+      entityType: "Trip",
+      entityId:   tripId,
+      payload:    { field: "driverId", from: existing.id, to: driverId },
+    }).catch(() => {});
+
+    return NextResponse.json({ data: { trip: updated }, error: null });
   }
 
   // ── DESAUTOMATIZAR ────────────────────────────────────────────────────────────
