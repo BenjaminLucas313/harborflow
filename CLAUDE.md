@@ -341,6 +341,39 @@ Skills are located in `.claude/skills/`. Claude should consult the relevant skil
 - Los endpoints de API deben seguir el patrón en `api-design-guide`
 - Toda migración de DB pasa por `db-guardian` primero
 
+## Scripts de administración
+
+### Carga masiva de usuarios desde Excel
+
+```bash
+npx tsx --env-file=.env src/scripts/cargar-usuarios-excel.ts \
+  --file=ruta/al/archivo.xlsx \
+  --company=slug-de-la-company
+```
+
+El archivo Excel debe tener una hoja con columnas (case-insensitive):
+`nombre`, `apellido`, `email`, `rol`, `departamento` (opcional)
+
+Roles válidos: `USUARIO`, `EMPRESA`, `UABL`, `PROVEEDOR`
+> Nota: `CONDUCTOR` no es un rol de usuario — es el modelo `Driver`, separado de `User`.
+
+El script:
+- Muestra errores de validación antes de procesar y pide confirmación para continuar con filas válidas
+- Crea usuarios nuevos o reactiva usuarios inactivos con contraseña temporal (`mustChangePassword: true`)
+- Envía email de bienvenida vía `sendBienvenida()` (fire-and-forget)
+- Registra cada acción en el `AuditLog` con `source: "batch-import"`
+
+Archivo de ejemplo: `docs/usuarios-ejemplo.xlsx`
+Para regenerarlo: `npx tsx src/scripts/generar-ejemplo-usuarios.ts`
+
+### Snapshot mensual
+
+```bash
+npm run snapshot:generar
+# o para un período específico:
+cross-env MES=3 ANIO=2026 npm run snapshot:generar
+```
+
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.
