@@ -14,7 +14,24 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/modules/audit/repository";
 import { cancelTrip } from "@/modules/trips/service";
 import { AppError } from "@/lib/errors";
-import { crearNotificacion } from "@/modules/notificaciones/service";
+import { crearNotificacion }    from "@/modules/notificaciones/service";
+import { sendEmailConductor }  from "@/services/email.service";
+
+function formatArgDateForEmail(date: Date): string {
+  const dateStr = date.toLocaleDateString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday:  "long",
+    day:      "numeric",
+    month:    "long",
+  });
+  const timeStr = date.toLocaleTimeString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    hour:     "2-digit",
+    minute:   "2-digit",
+    hour12:   false,
+  });
+  return `${dateStr.charAt(0).toUpperCase()}${dateStr.slice(1)}, ${timeStr} hs`;
+}
 
 const TERMINAL_VIAJE_STATUSES: TripStatus[] = [
   TripStatus.COMPLETED,
@@ -83,7 +100,9 @@ export async function PATCH(
     select: {
       id: true, status: true, automatizado: true,
       boatId: true, branchId: true, horaRecurrente: true, departureTime: true,
-      boat: { select: { name: true } },
+      capacity:    true,
+      boat:        { select: { name: true } },
+      tripRequest: { select: { origin: true, destination: true } },
     },
   });
   if (!existing) {
@@ -125,6 +144,55 @@ export async function PATCH(
       entityId:   tripId,
       payload:    { field: "driverId", from: existing.id, to: driverId },
     }).catch(() => {});
+
+    // Best-effort email to the newly assigned conductor.
+    if (driverId !== null) {
+      void (async () => {
+        try {
+          const [driverWithUser, confirmedSlots] = await Promise.all([
+            prisma.driver.findFirst({
+              where:  { id: driverId, companyId },
+              select: { user: { select: { firstName: true, email: true } } },
+            }),
+            // PassengerSlot uses `usuarioId`/`usuario` (not `userId`/`user`) and has
+            // a direct `department` relation — single query, no N+1.
+            prisma.passengerSlot.findMany({
+              where:  { tripId, companyId, status: "CONFIRMED" },
+              select: {
+                usuario:    { select: { firstName: true, lastName: true } },
+                department: { select: { name: true } },
+              },
+            }),
+          ]);
+
+          if (!driverWithUser?.user?.email) return;
+
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+          const fecha  = formatArgDateForEmail(existing.departureTime);
+          const lancha = `${existing.boat?.name ?? "Lancha"} — ${existing.capacity} asientos`;
+          const ruta   =
+            existing.tripRequest?.origin && existing.tripRequest?.destination
+              ? `${existing.tripRequest.origin} → ${existing.tripRequest.destination}`
+              : "Ruta no especificada";
+
+          await sendEmailConductor({
+            nombre:       driverWithUser.user.firstName,
+            email:        driverWithUser.user.email,
+            tripId,
+            fecha,
+            lancha,
+            ruta,
+            pasajeros:    confirmedSlots.map((s) => ({
+              nombre:       `${s.usuario.firstName} ${s.usuario.lastName}`,
+              departamento: s.department?.name ?? "Sin departamento",
+            })),
+            checklistUrl: `${appUrl}/conductor/viajes/${tripId}`,
+          });
+        } catch (err) {
+          console.error("[ASSIGN_DRIVER] sendEmailConductor error:", err);
+        }
+      })();
+    }
 
     return NextResponse.json({ data: { trip: updated }, error: null });
   }

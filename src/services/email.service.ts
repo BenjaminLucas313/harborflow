@@ -9,10 +9,11 @@
 // instead of sent, allowing the full flow to run without credentials.
 // =============================================================================
 
-import nodemailer          from "nodemailer";
-import { render }          from "@react-email/render";
-import { BienvenidaEmail } from "@/emails/BienvenidaEmail";
-import { ResetPasswordEmail } from "@/emails/ResetPasswordEmail";
+import nodemailer              from "nodemailer";
+import { render }              from "@react-email/render";
+import { BienvenidaEmail }     from "@/emails/BienvenidaEmail";
+import { ResetPasswordEmail }  from "@/emails/ResetPasswordEmail";
+import { ConductorEmail }      from "@/emails/ConductorEmail";
 
 // ---------------------------------------------------------------------------
 // Config — read env vars lazily inside each function, NOT at module level.
@@ -97,6 +98,73 @@ export interface ResetPasswordParams {
   email:  string;
   token:  string;
 }
+
+// ---------------------------------------------------------------------------
+// sendEmailConductor
+// ---------------------------------------------------------------------------
+
+export interface ConductorEmailParams {
+  nombre:       string;
+  email:        string;
+  tripId:       string;
+  fecha:        string;
+  lancha:       string;
+  ruta:         string;
+  pasajeros:    Array<{ nombre: string; departamento: string }>;
+  checklistUrl: string;
+}
+
+export async function sendEmailConductor(params: ConductorEmailParams): Promise<void> {
+  const { login, key, from, hasBrevo, isDev } = getConfig();
+
+  console.log("[email:conductor] called — hasBrevo:", hasBrevo, "| isDev:", isDev, "| to:", params.email);
+
+  if (!hasBrevo) {
+    if (isDev) {
+      console.log("[email:conductor] DEV MOCK (no BREVO credentials configured)");
+      console.log("  → nombre:  ", params.nombre);
+      console.log("  → fecha:   ", params.fecha);
+      console.log("  → lancha:  ", params.lancha);
+      console.log("  → ruta:    ", params.ruta);
+      console.log("  → pasajeros:", params.pasajeros.length);
+    } else {
+      console.error("[email:conductor] ERROR: BREVO_SMTP_LOGIN / BREVO_SMTP_KEY not set in production!");
+    }
+    return;
+  }
+
+  try {
+    console.log("[email:conductor] rendering template...");
+    const html = await render(
+      ConductorEmail({
+        nombre:       params.nombre,
+        tripId:       params.tripId,
+        fecha:        params.fecha,
+        lancha:       params.lancha,
+        ruta:         params.ruta,
+        pasajeros:    params.pasajeros,
+        checklistUrl: params.checklistUrl,
+      }),
+    );
+    console.log("[email:conductor] template rendered, sending via SMTP...");
+
+    const transporter = makeTransporter(login, key);
+    await transporter.sendMail({
+      from,
+      to:      params.email,
+      subject: `Fuiste asignado a un viaje — ${params.fecha}`,
+      html,
+    });
+
+    console.log("[email:conductor] ✓ sent successfully →", params.email);
+  } catch (err) {
+    console.error("[email:conductor] ✗ SMTP error:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// sendResetPassword
+// ---------------------------------------------------------------------------
 
 export async function sendResetPassword(params: ResetPasswordParams): Promise<void> {
   const { login, key, from, appUrl, hasBrevo, isDev } = getConfig();

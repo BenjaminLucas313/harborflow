@@ -29,6 +29,7 @@ export default async function ConductorLayout({
         role="CONDUCTOR"
         companyName={company?.name}
         homeHref="/conductor"
+        perfilHref="/conductor/perfil"
       />
       {children}
     </div>

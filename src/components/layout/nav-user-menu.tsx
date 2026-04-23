@@ -77,16 +77,18 @@ function barStyle(index: 1 | 2 | 3, open: boolean): React.CSSProperties {
 // ---------------------------------------------------------------------------
 
 type Props = {
-  firstName: string;
-  lastName:  string;
-  role:      string;
+  firstName:  string;
+  lastName:   string;
+  role:       string;
+  /** When provided, overrides the default /perfil href for the "Mi perfil" menu item. */
+  perfilHref?: string;
 };
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function NavUserMenu({ firstName, lastName, role }: Props) {
+export function NavUserMenu({ firstName, lastName, role, perfilHref }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -194,7 +196,7 @@ export function NavUserMenu({ firstName, lastName, role }: Props) {
           }}
         >
           <DropItem
-            href="/perfil"
+            href={perfilHref ?? "/perfil"}
             icon={<User size={15} aria-hidden="true" />}
             onClose={() => setOpen(false)}
           >

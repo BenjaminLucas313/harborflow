@@ -23,6 +23,8 @@ type Props = {
    * Only passed by the UABL layout — other roles don't see this.
    */
   assistantHref?: string;
+  /** When provided, overrides the /perfil link in the user menu for role-specific profile pages. */
+  perfilHref?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -35,6 +37,7 @@ export function AppNav({
   role,
   homeHref,
   assistantHref,
+  perfilHref,
 }: Props) {
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-card/95 backdrop-blur-sm">
@@ -83,7 +86,7 @@ export function AppNav({
         {/* Right side: notifications + user menu */}
         <div className="flex items-center gap-3 ml-auto">
           <NotificacionesBell />
-          <NavUserMenu firstName={firstName} lastName={lastName} role={role} />
+          <NavUserMenu firstName={firstName} lastName={lastName} role={role} perfilHref={perfilHref} />
         </div>
 
       </div>
