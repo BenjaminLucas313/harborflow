@@ -199,6 +199,9 @@ enum AuditAction {
   INFORME_GENERADO
   // ── V2: Trip automation ───────────────────────────────────────────────────
   TRIP_DESAUTOMATIZADO
+  // ── V2: Conductor operations ──────────────────────────────────────────────
+  CONDUCTOR_CHECKIN
+  SALIDA_CONFIRMADA
 }
 
 /// Status lifecycle for on-demand boat requests submitted by EMPRESA.
@@ -280,6 +283,7 @@ model Company {
   portStatuses        PortStatus[]
   operationalNotices  OperationalNotice[]
   checkIns            CheckIn[]
+  conductorCheckins   ConductorCheckin[]
   auditLogs           AuditLog[]
   tripRequests        TripRequest[]
   asientosLiquidacion AsientoLiquidacion[]
@@ -384,6 +388,10 @@ model User {
 
   /// For CONDUCTOR role: the Driver profile linked to this login account.
   driver                Driver?
+
+  // V2: conductor boarding checklist
+  conductorCheckins         ConductorCheckin[] @relation("ConductorCheckinOperator")
+  conductorCheckinPassenger ConductorCheckin[] @relation("ConductorCheckinPassenger")
 
   @@unique([companyId, email])
   @@index([companyId, role])
@@ -715,6 +723,12 @@ model Trip {
   /// Required when automatizado = true. Ignored otherwise.
   horaRecurrente       String?
 
+  /// Departure confirmation recorded by the assigned conductor.
+  salidaConfirmada    Boolean   @default(false)
+  salidaConfirmadaAt  DateTime?
+  /// User.id of the CONDUCTOR who confirmed departure.
+  salidaConfirmadaBy  String?
+
   company            Company             @relation(fields: [companyId], references: [id])
   branch             Branch              @relation(fields: [branchId], references: [id])
   boat               Boat                @relation(fields: [boatId], references: [id])
@@ -731,6 +745,7 @@ model Trip {
   tripRequest        TripRequest?
   /// Liquidation records for this trip (one per department that had seats).
   asientosLiquidacion AsientoLiquidacion[]
+  conductorCheckins   ConductorCheckin[]
 
   @@index([branchId, departureTime, status])
   @@index([companyId, departureTime])
@@ -1059,6 +1074,36 @@ model CheckIn {
   trip         Trip        @relation(fields: [tripId], references: [id])
   checkedInBy  User        @relation("CheckInOperator", fields: [checkedInByUserId], references: [id])
 
+  @@index([tripId])
+  @@index([companyId, tripId])
+}
+
+// =============================================================================
+// CONDUCTOR CHECKIN (V2)
+// =============================================================================
+
+/// V2 conductor boarding checklist — tracks passenger presence at departure.
+/// One record per (tripId, userId). Upserted by the assigned CONDUCTOR.
+/// Intentionally separate from the V1 CheckIn model (which links to Reservation).
+model ConductorCheckin {
+  id          String    @id @default(cuid())
+  companyId   String
+  tripId      String
+  /// The USUARIO being marked present or absent.
+  userId      String
+  /// User.id of the CONDUCTOR who recorded the check.
+  conductorId String
+  presente    Boolean   @default(false)
+  checkedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id])
+  trip      Trip    @relation(fields: [tripId], references: [id])
+  passenger User    @relation("ConductorCheckinPassenger", fields: [userId], references: [id])
+  conductor User    @relation("ConductorCheckinOperator", fields: [conductorId], references: [id])
+
+  @@unique([tripId, userId])
   @@index([tripId])
   @@index([companyId, tripId])
 }
