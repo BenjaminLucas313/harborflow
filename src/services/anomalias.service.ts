@@ -12,7 +12,8 @@
 //   LANCHA_BAJA_OCUPACION          — boat averaging <40% occupancy in last 30 days
 // =============================================================================
 
-import { prisma } from "@/lib/prisma";
+import { prisma }       from "@/lib/prisma";
+import { ViajeStatus } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,7 +81,7 @@ export async function detectarAnomalias(companyId: string): Promise<Anomalia[]> 
       where: {
         companyId,
         departureTime: { gte: now, lte: twoHoursLater },
-        viajeStatus:   "ACTIVO",
+        viajeStatus:   ViajeStatus.ACTIVO,
         status:        { notIn: ["CANCELLED", "DEPARTED", "COMPLETED"] },
       },
       select: {
@@ -126,7 +127,7 @@ export async function detectarAnomalias(companyId: string): Promise<Anomalia[]> 
       where: {
         companyId,
         departureTime: { gte: todayStart, lt: now },
-        viajeStatus:   "PASADO",
+        viajeStatus:   ViajeStatus.PASADO,
         status:        { notIn: ["CANCELLED"] },
       },
       select: {
@@ -203,7 +204,7 @@ export async function detectarAnomalias(companyId: string): Promise<Anomalia[]> 
       where: {
         companyId,
         departureTime: { gte: thirtyDaysAgo, lt: now },
-        viajeStatus:   { not: "CANCELADO" },
+        viajeStatus:   { not: ViajeStatus.CANCELADO },
       },
       select: {
         id:       true,

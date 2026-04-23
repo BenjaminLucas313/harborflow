@@ -20,6 +20,29 @@ import { prisma } from "@/lib/prisma";
 import { getAdminMetrics, getEficienciaMetrics } from "@/modules/metrics/admin-service";
 
 // ---------------------------------------------------------------------------
+// Rate limiter — in-memory, per user, resets on deploy (V1 acceptable)
+// ---------------------------------------------------------------------------
+
+type RateLimitEntry = { count: number; resetAt: number };
+const rateLimitMap = new Map<string, RateLimitEntry>();
+const HOURLY_LIMIT = 20;
+
+function checkRateLimit(userId: string): { allowed: boolean; minutesLeft?: number } {
+  const now   = Date.now();
+  const entry = rateLimitMap.get(userId);
+
+  if (!entry || entry.resetAt <= now) {
+    rateLimitMap.set(userId, { count: 1, resetAt: now + 60 * 60 * 1000 });
+    return { allowed: true };
+  }
+  if (entry.count >= HOURLY_LIMIT) {
+    return { allowed: false, minutesLeft: Math.ceil((entry.resetAt - now) / 60_000) };
+  }
+  entry.count += 1;
+  return { allowed: true };
+}
+
+// ---------------------------------------------------------------------------
 // Input schema
 // ---------------------------------------------------------------------------
 
@@ -53,7 +76,7 @@ async function requireUabl() {
       ),
     };
   }
-  return { ok: true as const, companyId: session.user.companyId };
+  return { ok: true as const, companyId: session.user.companyId, userId: session.user.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -451,7 +474,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { pregunta, mes, anio } = parsed.data;
-  const { companyId } = guard;
+  const { companyId, userId } = guard;
+
+  const rateCheck = checkRateLimit(userId);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: { code: "RATE_LIMITED", message: `Límite de requests alcanzado. Intentá en ${rateCheck.minutesLeft} minuto${rateCheck.minutesLeft !== 1 ? "s" : ""}.` } },
+      { status: 429 },
+    );
+  }
 
   // Gather all operational context in parallel
   const [metrics, eficiencia, proximos, viajes7, choferes, empleadores, portStatus] =
