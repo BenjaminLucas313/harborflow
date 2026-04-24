@@ -16,7 +16,7 @@ export default async function UablUsuarios() {
 
   const [rawUsers, branches, departments] = await Promise.all([
     prisma.user.findMany({
-      where:   { companyId },
+      where:   { companyId, isActive: true },
       select: {
         id:          true,
         email:       true,

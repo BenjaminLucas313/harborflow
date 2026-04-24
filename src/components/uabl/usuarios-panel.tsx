@@ -44,6 +44,7 @@ const ROLE_LABEL: Record<string, string> = {
   PROVEEDOR: "Proveedor",
   EMPRESA:   "Empresa",
   USUARIO:   "Usuario",
+  CONDUCTOR: "Conductor",
 };
 
 const ROLE_COLOR: Record<string, string> = {
@@ -51,6 +52,7 @@ const ROLE_COLOR: Record<string, string> = {
   PROVEEDOR: "bg-blue-100 text-blue-700",
   EMPRESA:   "bg-amber-100 text-amber-700",
   USUARIO:   "bg-slate-100 text-slate-600",
+  CONDUCTOR: "bg-teal-100 text-teal-700",
 };
 
 // ---------------------------------------------------------------------------
@@ -73,13 +75,15 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
   const { className: vibrateClass, trigger: vibrateTrigger } = useVibrate();
 
   // Form state
-  const [email,        setEmail]        = useState("");
-  const [firstName,    setFirstName]    = useState("");
-  const [lastName,     setLastName]     = useState("");
-  const [role,         setRole]         = useState("UABL");
-  const [branchId,     setBranchId]     = useState("");
-  const [departmentId, setDepartmentId] = useState("");
-  const [isUablAdmin,  setIsUablAdmin]  = useState(false);
+  const [email,         setEmail]         = useState("");
+  const [firstName,     setFirstName]     = useState("");
+  const [lastName,      setLastName]      = useState("");
+  const [role,          setRole]          = useState("UABL");
+  const [branchId,      setBranchId]      = useState("");
+  const [departmentId,  setDepartmentId]  = useState("");
+  const [isUablAdmin,   setIsUablAdmin]   = useState(false);
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [phone,         setPhone]         = useState("");
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -95,9 +99,11 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
         firstName,
         lastName,
         role,
-        branchId:     branchId     || undefined,
-        departmentId: departmentId || undefined,
-        isUablAdmin:  role === "UABL" ? isUablAdmin : false,
+        branchId:      branchId      || undefined,
+        departmentId:  departmentId  || undefined,
+        isUablAdmin:   role === "UABL" ? isUablAdmin : false,
+        licenseNumber: role === "CONDUCTOR" ? (licenseNumber || undefined) : undefined,
+        phone:         role === "CONDUCTOR" ? (phone         || undefined) : undefined,
       }),
     });
 
@@ -122,6 +128,7 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
     // Reset form
     setEmail(""); setFirstName(""); setLastName("");
     setRole("UABL"); setBranchId(""); setDepartmentId(""); setIsUablAdmin(false);
+    setLicenseNumber(""); setPhone("");
     setShowForm(false);
   }
 
@@ -215,13 +222,14 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
             <div className="space-y-1">
               <label className="text-sm font-medium">Rol <span className="text-red-500">*</span></label>
               <select
-                value={role} onChange={(e) => setRole(e.target.value)}
+                value={role} onChange={(e) => { setRole(e.target.value); setLicenseNumber(""); setPhone(""); }}
                 className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="UABL">UABL</option>
                 <option value="PROVEEDOR">Proveedor</option>
                 <option value="EMPRESA">Empresa</option>
                 <option value="USUARIO">Usuario</option>
+                <option value="CONDUCTOR">Conductor</option>
               </select>
             </div>
 
@@ -260,6 +268,27 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
               />
               Administrador UABL (puede gestionar departamentos, tipos de trabajo y usuarios)
             </label>
+          )}
+
+          {role === "CONDUCTOR" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Número de licencia</label>
+                <input
+                  value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)}
+                  placeholder="Ej: LM-12345"
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Teléfono de contacto</label>
+                <input
+                  value={phone} onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Ej: +54 9 11 1234-5678"
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
           )}
 
           {error && (

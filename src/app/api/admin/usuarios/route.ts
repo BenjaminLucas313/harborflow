@@ -41,14 +41,19 @@ function generateTempPassword(): string {
 // ---------------------------------------------------------------------------
 
 const CreateUserSchema = z.object({
-  email:        z.string().email(),
-  firstName:    z.string().min(1),
-  lastName:     z.string().min(1),
-  role:         z.enum(["UABL", "PROVEEDOR", "EMPRESA", "USUARIO"]),
-  branchId:     z.string().optional(),
-  departmentId: z.string().optional(),
-  isUablAdmin:  z.boolean().optional(),
-});
+  email:         z.string().email(),
+  firstName:     z.string().min(1),
+  lastName:      z.string().min(1),
+  role:          z.enum(["UABL", "PROVEEDOR", "EMPRESA", "USUARIO", "CONDUCTOR"]),
+  branchId:      z.string().optional(),
+  departmentId:  z.string().optional(),
+  isUablAdmin:   z.boolean().optional(),
+  licenseNumber: z.string().optional(),
+  phone:         z.string().optional(),
+}).refine(
+  (d) => d.role !== "CONDUCTOR" || !!d.branchId,
+  { message: "Los conductores requieren un puerto asignado.", path: ["branchId"] },
+);
 
 // ---------------------------------------------------------------------------
 // GET
@@ -74,7 +79,7 @@ export async function GET(): Promise<NextResponse> {
     }
 
     const users = await prisma.user.findMany({
-      where:   { companyId: session.user.companyId },
+      where:   { companyId: session.user.companyId, isActive: true },
       select: {
         id:          true,
         email:       true,
@@ -140,7 +145,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { email, firstName, lastName, role, branchId, departmentId, isUablAdmin } = parsed.data;
+    const { email, firstName, lastName, role, branchId, departmentId, isUablAdmin, licenseNumber, phone } = parsed.data;
     const { companyId } = session.user;
 
     // Find any existing user with this email (active or soft-deleted).
@@ -162,19 +167,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Soft-deleted user → reactivate in place, preserving the original id and audit history.
     if (existing && !existing.isActive) {
-      await prisma.user.updateMany({
-        where: { id: existing.id, companyId },
-        data: {
-          firstName,
-          lastName,
-          role,
-          passwordHash,
-          branchId:           branchId     || null,
-          departmentId:       departmentId || null,
-          isUablAdmin:        isUablAdmin  ?? false,
-          mustChangePassword: true,
-          isActive:           true,
-        },
+      await prisma.$transaction(async (tx) => {
+        await tx.user.updateMany({
+          where: { id: existing.id, companyId },
+          data: {
+            firstName,
+            lastName,
+            role,
+            passwordHash,
+            branchId:           branchId     || null,
+            departmentId:       departmentId || null,
+            isUablAdmin:        role === "UABL" ? (isUablAdmin ?? false) : false,
+            mustChangePassword: true,
+            isActive:           true,
+          },
+        });
+
+        if (role === "CONDUCTOR" && branchId) {
+          await tx.driver.upsert({
+            where:  { userId: existing.id },
+            update: { companyId, branchId, firstName, lastName, licenseNumber: licenseNumber || null, phone: phone || null, isActive: true },
+            create: { companyId, branchId, firstName, lastName, userId: existing.id, licenseNumber: licenseNumber || null, phone: phone || null },
+          });
+        }
       });
 
       await logAction({
@@ -193,21 +208,58 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // No existing user → create fresh.
-    const user = await prisma.user.create({
-      data: {
-        companyId,
-        email,
-        passwordHash,
-        firstName,
-        lastName,
-        role,
-        branchId:           branchId     || null,
-        departmentId:       departmentId || null,
-        isUablAdmin:        isUablAdmin  ?? false,
-        mustChangePassword: true,
-      },
-      select: { id: true, email: true, role: true, firstName: true },
-    });
+    // For CONDUCTOR: wrap User + Driver creation in a single transaction for atomicity.
+    let user: { id: string; email: string; role: string; firstName: string };
+
+    if (role === "CONDUCTOR" && branchId) {
+      user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            companyId,
+            email,
+            passwordHash,
+            firstName,
+            lastName,
+            role,
+            branchId,
+            departmentId: null,
+            isUablAdmin:  false,
+            mustChangePassword: true,
+          },
+          select: { id: true, email: true, role: true, firstName: true },
+        });
+
+        await tx.driver.create({
+          data: {
+            companyId,
+            branchId,
+            firstName,
+            lastName,
+            userId:        newUser.id,
+            licenseNumber: licenseNumber || null,
+            phone:         phone         || null,
+          },
+        });
+
+        return newUser;
+      });
+    } else {
+      user = await prisma.user.create({
+        data: {
+          companyId,
+          email,
+          passwordHash,
+          firstName,
+          lastName,
+          role,
+          branchId:           branchId     || null,
+          departmentId:       departmentId || null,
+          isUablAdmin:        role === "UABL" ? (isUablAdmin ?? false) : false,
+          mustChangePassword: true,
+        },
+        select: { id: true, email: true, role: true, firstName: true },
+      });
+    }
 
     await logAction({
       companyId,

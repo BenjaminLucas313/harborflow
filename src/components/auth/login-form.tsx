@@ -71,6 +71,16 @@ export function LoginForm() {
     window.location.replace(dest);
   };
 
+  // These overrides apply only to the dark-background login card.
+  // - text-white / placeholder:text-white/35 / caret-white: readable text on dark glass card.
+  // - WebkitBoxShadow inset: overrides Chrome's autofill blue background.
+  // - WebkitTextFillColor: overrides Chrome's autofill dark text fill.
+  const darkInputClassName = "text-white placeholder:text-white/35 caret-white";
+  const darkInputStyle: React.CSSProperties = {
+    WebkitBoxShadow:    "0 0 0 1000px #1a3560 inset",
+    WebkitTextFillColor: "#ffffff",
+  };
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
       {/* Root-level auth error */}
@@ -93,6 +103,8 @@ export function LoginForm() {
           placeholder={t("placeholders.organisation")}
           aria-invalid={!!errors.companySlug}
           aria-describedby={errors.companySlug ? "companySlug-error" : undefined}
+          className={darkInputClassName}
+          style={darkInputStyle}
           {...register("companySlug")}
         />
         {errors.companySlug && (
@@ -112,6 +124,8 @@ export function LoginForm() {
           placeholder={t("placeholders.email")}
           aria-invalid={!!errors.email}
           aria-describedby={errors.email ? "email-error" : undefined}
+          className={darkInputClassName}
+          style={darkInputStyle}
           {...register("email")}
         />
         {errors.email && (
@@ -130,6 +144,8 @@ export function LoginForm() {
           autoComplete="current-password"
           aria-invalid={!!errors.password}
           aria-describedby={errors.password ? "password-error" : undefined}
+          className={darkInputClassName}
+          style={darkInputStyle}
           {...register("password")}
         />
         {errors.password && (
