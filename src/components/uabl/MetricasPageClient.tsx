@@ -10,6 +10,7 @@
 import { useState, useCallback } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { UablMetricasDashboard }    from "./UablMetricasDashboard";
+import { MesActualCard }           from "./MesActualCard";
 import { SnapshotComparativo }      from "./SnapshotComparativo";
 import { InformeNarrativoCard }     from "./InformeNarrativoCard";
 
@@ -190,6 +191,11 @@ export function MetricasPageClient({
           </button>
         </div>
       </div>
+
+      {/* ── Mes en curso — tiempo real (sin snapshot) ───────────────────────── */}
+      <MesActualCard />
+
+      <hr className="border-border" />
 
       {/* ── Dashboard (accepts controlled filter props) ─────────────────────── */}
       <UablMetricasDashboard

@@ -28,7 +28,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Send, Loader2, RefreshCw, Check, X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { SafeMarkdown } from "@/components/ui/SafeMarkdown";
 import type { AdminMetrics } from "@/modules/metrics/admin-service";
 import { useConfirmPop } from "@/hooks/useButtonAnimation";
 
@@ -659,7 +659,8 @@ export function UablAssistant({ mes, anio, branchName }: UablAssistantProps) {
               }
             >
               {msg.role === "assistant" ? (
-                <ReactMarkdown
+                <SafeMarkdown
+                  content={msg.content}
                   components={{
                     p:      ({ children }) => <p style={{ margin: "4px 0" }}>{children}</p>,
                     strong: ({ children }) => <strong style={{ color: "#1549a0", fontWeight: 500 }}>{children}</strong>,
@@ -667,9 +668,7 @@ export function UablAssistant({ mes, anio, branchName }: UablAssistantProps) {
                     ol:     ({ children }) => <ol style={{ paddingLeft: "16px", margin: "4px 0" }}>{children}</ol>,
                     li:     ({ children }) => <li style={{ margin: "2px 0" }}>{children}</li>,
                   }}
-                >
-                  {msg.content}
-                </ReactMarkdown>
+                />
               ) : (
                 msg.content
               )}

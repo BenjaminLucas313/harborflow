@@ -9,7 +9,7 @@
 //   - When informe exists: ReactMarkdown content + "Regenerar" + "Descargar PDF"
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import ReactMarkdown                                  from "react-markdown";
+import { SafeMarkdown }                               from "@/components/ui/SafeMarkdown";
 import { FileText, Loader2, RefreshCw, Download }    from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ export function InformeNarrativoCard() {
                 [&_ul]:text-sm  [&_ul]:my-1.5 [&_li]:my-0.5
                 [&_strong]:font-semibold"
             >
-              <ReactMarkdown>{informe.contenido}</ReactMarkdown>
+              <SafeMarkdown content={informe.contenido} />
             </div>
           </div>
         )}
