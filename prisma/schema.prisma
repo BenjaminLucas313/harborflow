@@ -197,6 +197,8 @@ enum AuditAction {
   ANOMALIA_NOTIFICADA
   // ── V2: Narrative reports ─────────────────────────────────────────────────
   INFORME_GENERADO
+  // ── V2: Email notifications ───────────────────────────────────────────────
+  EMAIL_MENSUAL_ENVIADO
   // ── V2: Trip automation ───────────────────────────────────────────────────
   TRIP_DESAUTOMATIZADO
   // ── V2: Conductor operations ──────────────────────────────────────────────

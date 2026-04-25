@@ -60,6 +60,7 @@ export default async function MetricasPage() {
         defaultMes={mes}
         defaultAnio={anio}
         defaultBranchId={defaultBranchId}
+        isUablAdmin={session.user.isUablAdmin}
       />
     </main>
   );

@@ -11,9 +11,10 @@
 
 import nodemailer              from "nodemailer";
 import { render }              from "@react-email/render";
-import { BienvenidaEmail }     from "@/emails/BienvenidaEmail";
-import { ResetPasswordEmail }  from "@/emails/ResetPasswordEmail";
-import { ConductorEmail }      from "@/emails/ConductorEmail";
+import { BienvenidaEmail }                from "@/emails/BienvenidaEmail";
+import { ResetPasswordEmail }            from "@/emails/ResetPasswordEmail";
+import { ConductorEmail }               from "@/emails/ConductorEmail";
+import { EmailMensualDepartamento }     from "@/emails/EmailMensualDepartamento";
 
 // ---------------------------------------------------------------------------
 // Config — read env vars lazily inside each function, NOT at module level.
@@ -159,6 +160,80 @@ export async function sendEmailConductor(params: ConductorEmailParams): Promise<
     console.log("[email:conductor] ✓ sent successfully →", params.email);
   } catch (err) {
     console.error("[email:conductor] ✗ SMTP error:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// sendResetPassword
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// sendEmailMensualDepartamento
+// ---------------------------------------------------------------------------
+
+export interface EmailMensualDepartamentoParams {
+  departamento:       string;
+  email:              string;
+  mes:                string;   // "Abril 2026"
+  totalViajes:        number;
+  asientosUsados:     number;
+  asientosVacios:     number;
+  totalAsientos:      number;
+  variacionAsientos?: number;
+  companyName:        string;
+}
+
+export async function sendEmailMensualDepartamento(
+  params: EmailMensualDepartamentoParams,
+): Promise<void> {
+  const { login, key, from, hasBrevo, isDev } = getConfig();
+
+  console.log(
+    "[email:mensual-dept] called — hasBrevo:", hasBrevo,
+    "| isDev:", isDev,
+    "| to:", params.email,
+    "| dept:", params.departamento,
+  );
+
+  if (!hasBrevo) {
+    if (isDev) {
+      console.log("[email:mensual-dept] DEV MOCK (no BREVO credentials configured)");
+      console.log("  → departamento:", params.departamento);
+      console.log("  → mes:         ", params.mes);
+      console.log("  → totalViajes: ", params.totalViajes);
+      console.log("  → totalAsientos:", params.totalAsientos);
+    } else {
+      console.error("[email:mensual-dept] ERROR: BREVO_SMTP_LOGIN / BREVO_SMTP_KEY not set in production!");
+    }
+    return;
+  }
+
+  try {
+    const html = await render(
+      EmailMensualDepartamento({
+        departamento:       params.departamento,
+        mes:                params.mes,
+        totalViajes:        params.totalViajes,
+        asientosUsados:     params.asientosUsados,
+        asientosVacios:     params.asientosVacios,
+        totalAsientos:      params.totalAsientos,
+        variacionAsientos:  params.variacionAsientos,
+        companyName:        params.companyName,
+      }),
+    );
+
+    const transporter = makeTransporter(login, key);
+    await transporter.sendMail({
+      from,
+      to:      params.email,
+      subject: `Resumen de transporte — ${params.mes} — ${params.departamento}`,
+      html,
+    });
+
+    console.log("[email:mensual-dept] ✓ sent →", params.email);
+  } catch (err) {
+    console.error("[email:mensual-dept] ✗ SMTP error:", err);
+    throw err; // re-throw so the caller can track errores count
   }
 }
 

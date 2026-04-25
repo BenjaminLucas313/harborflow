@@ -8,7 +8,7 @@
 // InformeNarrativoCard is rendered last — monthly AI executive report.
 
 import { useState, useCallback } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Mail } from "lucide-react";
 import { UablMetricasDashboard }    from "./UablMetricasDashboard";
 import { MesActualCard }           from "./MesActualCard";
 import { SnapshotComparativo }      from "./SnapshotComparativo";
@@ -21,12 +21,15 @@ import { InformeNarrativoCard }     from "./InformeNarrativoCard";
 type Branch = { id: string; name: string };
 type Dept   = { id: string; name: string };
 
+type EmailResult = { enviados: number; omitidos: number; errores: number };
+
 type Props = {
   branches:        Branch[];
   departments:     Dept[];
   defaultMes:      number;
   defaultAnio:     number;
   defaultBranchId: string;
+  isUablAdmin:     boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -59,7 +62,7 @@ function monthEnd(mes: number, anio: number): string {
 // ---------------------------------------------------------------------------
 
 export function MetricasPageClient({
-  branches, departments, defaultMes, defaultAnio, defaultBranchId,
+  branches, departments, defaultMes, defaultAnio, defaultBranchId, isUablAdmin,
 }: Props) {
   const [mes,          setMesRaw]       = useState(defaultMes);
   const [anio,         setAnioRaw]      = useState(defaultAnio);
@@ -69,6 +72,10 @@ export function MetricasPageClient({
   const [dateTo,       setDateTo]       = useState(() => monthEnd(defaultMes, defaultAnio));
   const [triggerFetch, setTriggerFetch] = useState(0);
   const [pending,      setPending]      = useState(false);
+
+  // Email mensual state
+  const [enviandoEmail, setEnviandoEmail] = useState(false);
+  const [emailResult,   setEmailResult]   = useState<EmailResult | null>(null);
 
   // When month/year changes, auto-sync date range to full calendar month.
   const setMes = useCallback((m: number) => {
@@ -86,6 +93,30 @@ export function MetricasPageClient({
   function handleFiltrar() {
     setPending(true);
     setTriggerFetch((n) => n + 1);
+  }
+
+  async function handleEnviarEmail() {
+    if (!window.confirm(
+      `¿Enviar el resumen de ${MONTH_NAMES[mes - 1]} ${anio} a todos los departamentos con email configurado?`,
+    )) return;
+
+    setEnviandoEmail(true);
+    setEmailResult(null);
+    try {
+      const res  = await fetch("/api/emails/mensual", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ mes, anio }),
+      });
+      const json = await res.json() as EmailResult & { error?: { message: string } };
+      if (!res.ok) throw new Error((json as { error?: { message: string } }).error?.message ?? "Error al enviar.");
+      setEmailResult({ enviados: json.enviados, omitidos: json.omitidos, errores: json.errores });
+    } catch (e) {
+      setEmailResult({ enviados: 0, omitidos: 0, errores: -1 });
+      console.error("[MetricasPageClient] handleEnviarEmail:", e);
+    } finally {
+      setEnviandoEmail(false);
+    }
   }
 
   return (
@@ -191,6 +222,38 @@ export function MetricasPageClient({
           </button>
         </div>
       </div>
+
+      {/* ── Enviar resumen mensual (solo isUablAdmin) ───────────────────────── */}
+      {isUablAdmin && (
+        <div className="flex flex-wrap items-center gap-3 print:hidden">
+          <button
+            type="button"
+            onClick={() => { void handleEnviarEmail(); }}
+            disabled={enviandoEmail}
+            className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {enviandoEmail
+              ? <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              : <Mail    className="size-4"              aria-hidden="true" />
+            }
+            {enviandoEmail ? "Enviando…" : "Enviar resumen mensual por email"}
+          </button>
+
+          {emailResult && emailResult.errores === -1 && (
+            <p className="text-sm text-destructive">
+              Error al enviar los emails. Revisá los logs del servidor.
+            </p>
+          )}
+
+          {emailResult && emailResult.errores !== -1 && (
+            <p className="text-sm text-muted-foreground">
+              <span className="text-emerald-600 font-medium">{emailResult.enviados} enviado{emailResult.enviados !== 1 ? "s" : ""}</span>
+              {emailResult.omitidos > 0 && <> · {emailResult.omitidos} omitido{emailResult.omitidos !== 1 ? "s" : ""} (sin email)</>}
+              {emailResult.errores  > 0 && <> · <span className="text-destructive">{emailResult.errores} error{emailResult.errores !== 1 ? "es" : ""}</span></>}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Mes en curso — tiempo real (sin snapshot) ───────────────────────── */}
       <MesActualCard />
