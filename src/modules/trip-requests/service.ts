@@ -56,6 +56,14 @@ export async function createTripRequest(
     );
   }
 
+  if (input.requestedDate <= new Date()) {
+    throw new AppError(
+      "VALIDATION_ERROR",
+      "La fecha solicitada ya pasó. Seleccioná una fecha futura.",
+      400,
+    );
+  }
+
   console.log(`[createTripRequest] companyId=${ctx.companyId} requestedById=${ctx.requestedById}`);
 
   const request = await repoCreate({

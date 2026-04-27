@@ -59,6 +59,7 @@ export default async function TripDetail({
   });
 
   const isCompleted = trip.viajeStatus === "PASADO";
+  const isPastTrip  = new Date(trip.departureTime) <= new Date();
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 space-y-6">
@@ -95,6 +96,16 @@ export default async function TripDetail({
           </a>
         )}
       </div>
+
+      {/* Past-trip warning — disables slot review actions */}
+      {isPastTrip && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4">
+          <p className="font-semibold text-amber-800">Viaje ya partió</p>
+          <p className="text-sm text-amber-700 mt-0.5">
+            No se pueden aprobar ni rechazar slots para viajes pasados.
+          </p>
+        </div>
+      )}
 
       {/* Global occupancy — visible to all UABL regardless of department */}
       <div className="rounded-xl border border-border bg-muted/40 px-5 py-4 space-y-3">
@@ -135,7 +146,7 @@ export default async function TripDetail({
         <ul className="space-y-3">
           {slots.map((slot) => (
             <li key={slot.id}>
-              <SlotReviewCard slot={slot} />
+              <SlotReviewCard slot={slot} tripDeparted={isPastTrip} />
             </li>
           ))}
         </ul>

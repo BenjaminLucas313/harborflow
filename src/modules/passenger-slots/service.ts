@@ -52,6 +52,18 @@ export async function reviewSlot(
     assertDepartment(ctx.departmentId, slot.departmentId);
   }
 
+  const tripForSlot = await prisma.trip.findUnique({
+    where:  { id: slot.tripId },
+    select: { departureTime: true },
+  });
+  if (tripForSlot && tripForSlot.departureTime <= new Date()) {
+    throw new AppError(
+      "TRIP_DEPARTURE_PAST",
+      "Este viaje ya partió. No se pueden modificar los slots.",
+      400,
+    );
+  }
+
   if (slot.status !== "PENDING") {
     throw new AppError(
       "SLOT_NOT_PENDING",

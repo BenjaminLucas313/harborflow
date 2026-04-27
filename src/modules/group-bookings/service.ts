@@ -54,11 +54,12 @@ export async function createGroupBooking(
   const trip = await prisma.trip.findUnique({
     where:  { id: input.tripId },
     select: {
-      id:       true,
-      companyId: true,
-      branchId: true,
-      status:   true,
-      capacity: true,
+      id:            true,
+      companyId:     true,
+      branchId:      true,
+      status:        true,
+      capacity:      true,
+      departureTime: true,
       passengerSlots: input.slotsRequested
         ? { where: { status: { in: ["PENDING", "CONFIRMED"] } }, select: { id: true } }
         : undefined,
@@ -67,6 +68,10 @@ export async function createGroupBooking(
 
   if (!trip || trip.companyId !== ctx.companyId) {
     throw new AppError("TRIP_NOT_FOUND", "Viaje no encontrado.", 404);
+  }
+
+  if (trip.departureTime <= new Date()) {
+    throw new AppError("TRIP_DEPARTURE_PAST", "Este viaje ya partió y no acepta nuevas reservas.", 400);
   }
 
   const bookableStatuses = ["SCHEDULED", "BOARDING", "DELAYED"] as const;
@@ -185,9 +190,13 @@ export async function addSlotToBooking(
       // Count seats already consumed (PENDING holds capacity).
       const trip = await tx.trip.findUnique({
         where:  { id: booking.tripId },
-        select: { capacity: true },
+        select: { capacity: true, departureTime: true },
       });
       if (!trip) throw new AppError("TRIP_NOT_FOUND", "Viaje no encontrado.", 404);
+
+      if (trip.departureTime <= new Date()) {
+        throw new AppError("TRIP_DEPARTURE_PAST", "Este viaje ya partió. No se pueden agregar pasajeros.", 400);
+      }
 
       const occupied = await tx.passengerSlot.count({
         where: {
@@ -295,6 +304,14 @@ export async function submitGroupBooking(
       "Debe agregar al menos un pasajero antes de enviar.",
       400,
     );
+  }
+
+  const tripCheck = await prisma.trip.findUnique({
+    where:  { id: booking.tripId },
+    select: { departureTime: true },
+  });
+  if (tripCheck && tripCheck.departureTime <= new Date()) {
+    throw new AppError("TRIP_DEPARTURE_PAST", "Este viaje ya partió. No se puede enviar la reserva.", 400);
   }
 
   const updated = await updateGroupBookingStatus(bookingId, "SUBMITTED");

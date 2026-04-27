@@ -9,9 +9,10 @@ import type { SlotWithRelations } from "@/modules/passenger-slots/repository";
 
 type Props = {
   slot: SlotWithRelations;
+  tripDeparted?: boolean;
 };
 
-export function SlotReviewCard({ slot }: Props) {
+export function SlotReviewCard({ slot, tripDeparted = false }: Props) {
   const [rejectionNote,  setRejectionNote]  = useState("");
   const [showReject,     setShowReject]     = useState(false);
   const [showRevert,     setShowRevert]     = useState(false);
@@ -121,11 +122,17 @@ export function SlotReviewCard({ slot }: Props) {
           </span>
         )}
 
-        {/* Pending badge */}
-        {isPending && (
+        {/* Pending badge — or "Viaje ya partió" for past trips */}
+        {isPending && !tripDeparted && (
           <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 shrink-0">
             <Clock className="size-3" />
             Pendiente
+          </span>
+        )}
+        {isPending && tripDeparted && (
+          <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 shrink-0">
+            <Clock className="size-3" />
+            Viaje ya partió
           </span>
         )}
       </div>
@@ -145,8 +152,8 @@ export function SlotReviewCard({ slot }: Props) {
         </p>
       )}
 
-      {/* Actions — only for PENDING slots */}
-      {isPending && (
+      {/* Actions — only for PENDING slots on non-departed trips */}
+      {isPending && !tripDeparted && (
         <div className="space-y-2">
           <div className="flex gap-2">
             <button
