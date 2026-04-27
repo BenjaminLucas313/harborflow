@@ -10,6 +10,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { Loader2, RefreshCw, Mail, CalendarCheck, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { ejecutarCierreMensual } from "@/app/actions/cierre-mensual";
 import { UablMetricasDashboard }    from "./UablMetricasDashboard";
 import { MesActualCard }           from "./MesActualCard";
 import { SnapshotComparativo }      from "./SnapshotComparativo";
@@ -160,23 +161,9 @@ export function MetricasPageClient({
       setCierreStep((s) => (s + 1) % CIERRE_STEPS.length);
     }, 6000);
 
-    fetch("/api/jobs/cierre-mensual", {
-      method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "X-Job-Secret":  process.env.NEXT_PUBLIC_JOB_SECRET ?? "",
-      },
-      body: JSON.stringify({ mes, anio }),
-    })
-      .then(async (res) => {
-        const json = await res.json() as
-          | { data: CierreResult }
-          | { error: { code: string; message: string } };
-
-        if (!res.ok || "error" in json) {
-          const msg = "error" in json ? json.error.message : `HTTP ${res.status}`;
-          throw new Error(msg);
-        }
+    ejecutarCierreMensual(mes, anio)
+      .then((json) => {
+        if ("error" in json) throw new Error(json.error.message);
         setCierreResult(json.data);
       })
       .catch((err: unknown) => {
