@@ -1,42 +1,42 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { listTripRequestsByCompany } from "@/modules/trip-requests/service";
-import { prisma } from "@/lib/prisma";
+import { Suspense }  from "react";
+import { redirect }  from "next/navigation";
+import { auth }      from "@/lib/auth";
+import { prisma }    from "@/lib/prisma";
 import { TripRequestCard } from "@/components/proveedor/trip-request-card";
+import { getPageParam, buildPaginationMeta } from "@/lib/pagination";
+import { Pagination } from "@/components/ui/Pagination";
+import {
+  listPendingByCompanyPaginated,
+  listHistorialByCompanyPaginated,
+} from "@/modules/trip-requests/repository";
 
-export default async function ProveedorSolicitudes() {
+export default async function ProveedorSolicitudes({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const all = await listTripRequestsByCompany(session.user.companyId);
+  const sp = await searchParams;
 
-  const now = new Date();
+  const { page: pageActivas,   skip: skipActivas   } = getPageParam(sp, "pageActivas");
+  const { page: pageHistorial, skip: skipHistorial } = getPageParam(sp, "pageHistorial");
 
-  // PENDING with requestedDate in the future → actionable.
-  const pending = all
-    .filter((r) => r.status === "PENDING" && r.requestedDate > now)
-    .sort((a, b) => a.requestedDate.getTime() - b.requestedDate.getTime());
+  const [pendingResult, historialResult, boats] = await Promise.all([
+    listPendingByCompanyPaginated(session.user.companyId, skipActivas, 20),
+    listHistorialByCompanyPaginated(session.user.companyId, skipHistorial, 20),
+    prisma.boat.findMany({
+      where:   { companyId: session.user.companyId, isActive: true },
+      select:  { id: true, name: true, capacity: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
-  // PENDING but past requestedDate → expired, no actions allowed.
-  const expired = all
-    .filter((r) => r.status === "PENDING" && r.requestedDate <= now)
-    .sort((a, b) => b.requestedDate.getTime() - a.requestedDate.getTime());
+  const metaActivas   = buildPaginationMeta(pendingResult.total,   pageActivas);
+  const metaHistorial = buildPaginationMeta(historialResult.total, pageHistorial);
 
-  // Everything non-PENDING (FULFILLED, REJECTED, CANCELLED) → history.
-  const resolved = all
-    .filter((r) => r.status !== "PENDING")
-    .sort((a, b) => b.requestedDate.getTime() - a.requestedDate.getTime());
-
-  // Historial = resolved + expired, capped at 20, most recent first.
-  const historial = [...expired.map((r) => ({ ...r, _expired: true })), ...resolved]
-    .sort((a, b) => b.requestedDate.getTime() - a.requestedDate.getTime())
-    .slice(0, 20);
-
-  const boats = await prisma.boat.findMany({
-    where:   { companyId: session.user.companyId, isActive: true },
-    select:  { id: true, name: true, capacity: true },
-    orderBy: { name: "asc" },
-  });
+  const isEmpty = pendingResult.total === 0 && historialResult.total === 0;
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 space-y-8">
@@ -47,36 +47,54 @@ export default async function ProveedorSolicitudes() {
         </p>
       </div>
 
-      {pending.length === 0 && historial.length === 0 && (
+      {isEmpty && (
         <div className="py-12 text-center text-sm text-muted-foreground">
           No hay solicitudes registradas.
         </div>
       )}
 
-      {pending.length > 0 && (
+      {/* Pendientes (PENDING + requestedDate > now) */}
+      {(pendingResult.data.length > 0 || pageActivas > 1) && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Pendientes ({pending.length})
+            Pendientes ({pendingResult.total})
           </h2>
-          {pending.map((req) => (
+          {pendingResult.data.map((req) => (
             <TripRequestCard key={req.id} request={req as never} boats={boats} expired={false} />
           ))}
+          <Suspense fallback={null}>
+            <Pagination
+              page={pageActivas}
+              totalPages={metaActivas.totalPages}
+              total={pendingResult.total}
+              paramName="pageActivas"
+            />
+          </Suspense>
         </section>
       )}
 
-      {historial.length > 0 && (
+      {/* Historial (resolved + expired PENDING) */}
+      {(historialResult.data.length > 0 || pageHistorial > 1) && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Historial ({historial.length})
+            Historial ({historialResult.total})
           </h2>
-          {historial.map((req) => (
+          {historialResult.data.map((req) => (
             <TripRequestCard
               key={req.id}
               request={req as never}
               boats={boats}
-              expired={"_expired" in req && req._expired === true}
+              expired={req.status === "PENDING"}
             />
           ))}
+          <Suspense fallback={null}>
+            <Pagination
+              page={pageHistorial}
+              totalPages={metaHistorial.totalPages}
+              total={historialResult.total}
+              paramName="pageHistorial"
+            />
+          </Suspense>
         </section>
       )}
     </main>

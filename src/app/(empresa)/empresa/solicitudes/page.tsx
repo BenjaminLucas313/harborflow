@@ -1,31 +1,48 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { auth } from "@/lib/auth";
-import { listTripRequestsByRequester } from "@/modules/trip-requests/service";
-import { Plus } from "lucide-react";
+import { Suspense }  from "react";
+import { redirect }  from "next/navigation";
+import Link          from "next/link";
+import { auth }      from "@/lib/auth";
+import { Plus }      from "lucide-react";
+import { getPageParam, buildPaginationMeta } from "@/lib/pagination";
+import { Pagination } from "@/components/ui/Pagination";
 import { SolicitudesList } from "@/components/empresa/solicitudes-list";
+import {
+  listActivasByRequesterPaginated,
+  listHistorialByRequesterPaginated,
+} from "@/modules/trip-requests/repository";
 
-export default async function MisSolicitudes() {
+export default async function MisSolicitudes({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const allRequests = await listTripRequestsByRequester(
-    session.user.companyId,
-    session.user.id,
-  );
+  const sp = await searchParams;
 
-  const now = new Date();
+  const { page: pageActivas,   skip: skipActivas   } = getPageParam(sp, "pageActivas");
+  const { page: pageHistorial, skip: skipHistorial } = getPageParam(sp, "pageHistorial");
 
-  // Active: requestedDate in the future, ascending by date.
-  const activas = allRequests
-    .filter((r) => r.requestedDate > now)
-    .sort((a, b) => a.requestedDate.getTime() - b.requestedDate.getTime());
+  const [activasResult, historialResult] = await Promise.all([
+    listActivasByRequesterPaginated(
+      session.user.companyId,
+      session.user.id,
+      skipActivas,
+      20,
+    ),
+    listHistorialByRequesterPaginated(
+      session.user.companyId,
+      session.user.id,
+      skipHistorial,
+      20,
+    ),
+  ]);
 
-  // History: requestedDate in the past or today, descending, capped at 20.
-  const historial = allRequests
-    .filter((r) => r.requestedDate <= now)
-    .sort((a, b) => b.requestedDate.getTime() - a.requestedDate.getTime())
-    .slice(0, 20);
+  const metaActivas   = buildPaginationMeta(activasResult.total,   pageActivas);
+  const metaHistorial = buildPaginationMeta(historialResult.total, pageHistorial);
+
+  const isEmpty = activasResult.total === 0 && historialResult.total === 0;
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 space-y-8">
@@ -45,27 +62,45 @@ export default async function MisSolicitudes() {
         </Link>
       </div>
 
-      {activas.length === 0 && historial.length === 0 && (
+      {isEmpty && (
         <div className="py-12 text-center text-sm text-muted-foreground">
           Todavía no enviaste ninguna solicitud.
         </div>
       )}
 
-      {activas.length > 0 && (
+      {/* Activas */}
+      {(activasResult.data.length > 0 || pageActivas > 1) && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Activas ({activas.length})
+            Activas ({activasResult.total})
           </h2>
-          <SolicitudesList requests={activas} dimmed={false} />
+          <SolicitudesList requests={activasResult.data} dimmed={false} />
+          <Suspense fallback={null}>
+            <Pagination
+              page={pageActivas}
+              totalPages={metaActivas.totalPages}
+              total={activasResult.total}
+              paramName="pageActivas"
+            />
+          </Suspense>
         </section>
       )}
 
-      {historial.length > 0 && (
+      {/* Historial */}
+      {(historialResult.data.length > 0 || pageHistorial > 1) && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Historial (últimas {historial.length})
+            Historial ({historialResult.total})
           </h2>
-          <SolicitudesList requests={historial} dimmed={true} />
+          <SolicitudesList requests={historialResult.data} dimmed={true} />
+          <Suspense fallback={null}>
+            <Pagination
+              page={pageHistorial}
+              totalPages={metaHistorial.totalPages}
+              total={historialResult.total}
+              paramName="pageHistorial"
+            />
+          </Suspense>
         </section>
       )}
     </main>

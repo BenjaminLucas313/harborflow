@@ -3,6 +3,7 @@ import { redirect }     from "next/navigation";
 import Link             from "next/link";
 import { auth }         from "@/lib/auth";
 import { prisma }       from "@/lib/prisma";
+import { TripStatus }   from "@prisma/client";
 import { getPageParam, buildPaginationMeta, PAGE_SIZE } from "@/lib/pagination";
 import { Pagination }   from "@/components/ui/Pagination";
 
@@ -30,7 +31,7 @@ export default async function UablViajes({
 
   const upcomingWhere = {
     companyId,
-    status:        { in: ["SCHEDULED", "BOARDING", "DELAYED"] as const },
+    status:        { in: ["SCHEDULED", "BOARDING", "DELAYED"] as TripStatus[] },
     departureTime: { gte: new Date() },
   };
   const pastWhere = { companyId, viajeStatus: "PASADO" as const };
