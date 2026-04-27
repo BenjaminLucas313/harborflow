@@ -13,6 +13,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, RefreshCw, User } from "lucide-react";
 import { DayDivider } from "@/components/ui/DayDivider";
+import { Pagination } from "@/components/ui/Pagination";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -234,12 +235,16 @@ function LoadMoreButton({
 // Main export
 // ---------------------------------------------------------------------------
 
+type PageMeta = { page: number; totalPages: number; total: number };
+
 type Props = {
-  proximos: TripItem[];
-  pasados:  TripItem[];
+  proximos:      TripItem[];
+  pasados:       TripItem[];
+  proximosMeta?: PageMeta;
+  pasadosMeta?:  PageMeta;
 };
 
-export function ViajesGrouped({ proximos, pasados }: Props) {
+export function ViajesGrouped({ proximos, pasados, proximosMeta, pasadosMeta }: Props) {
   const [showAllProximos, setShowAllProximos] = useState(false);
   const [showAllPasados,  setShowAllPasados]  = useState(false);
 
@@ -273,29 +278,40 @@ export function ViajesGrouped({ proximos, pasados }: Props) {
     <div className="space-y-6">
       {/* ── Próximos ───────────────────────────────────────────────────────── */}
       {proximosByDay.length > 0 && (
-        <CollapsibleSection
-          title="Próximos"
-          count={proximos.length}
-          defaultOpen={true}
-        >
-          {visibleProximos.map(([dateKey, dayTrips], i) => (
-            <div key={dateKey}>
-              {/* Every day group gets a divider (first included) */}
-              {i > 0 && <DayDivider dateStr={dateKey} />}
-              {i === 0 && <DayDivider dateStr={dateKey} />}
-              {dayTrips.map((t) => (
-                <TripRow key={t.id} trip={t} />
-              ))}
-            </div>
-          ))}
+        <>
+          <CollapsibleSection
+            title="Próximos"
+            count={proximos.length}
+            defaultOpen={true}
+          >
+            {visibleProximos.map(([dateKey, dayTrips], i) => (
+              <div key={dateKey}>
+                {/* Every day group gets a divider (first included) */}
+                {i > 0 && <DayDivider dateStr={dateKey} />}
+                {i === 0 && <DayDivider dateStr={dateKey} />}
+                {dayTrips.map((t) => (
+                  <TripRow key={t.id} trip={t} />
+                ))}
+              </div>
+            ))}
 
-          <LoadMoreButton
-            hidden={hiddenProximosDays}
-            total={proximos.length}
-            visible={proximosVisible}
-            onClick={() => setShowAllProximos(true)}
-          />
-        </CollapsibleSection>
+            <LoadMoreButton
+              hidden={hiddenProximosDays}
+              total={proximos.length}
+              visible={proximosVisible}
+              onClick={() => setShowAllProximos(true)}
+            />
+          </CollapsibleSection>
+
+          {proximosMeta && (
+            <Pagination
+              page={proximosMeta.page}
+              totalPages={proximosMeta.totalPages}
+              total={proximosMeta.total}
+              paramName="pageProximos"
+            />
+          )}
+        </>
       )}
 
       {/* ── Separator between sections ───────────────────────────────────── */}
@@ -305,27 +321,38 @@ export function ViajesGrouped({ proximos, pasados }: Props) {
 
       {/* ── Pasados ────────────────────────────────────────────────────────── */}
       {pasadosByDay.length > 0 && (
-        <CollapsibleSection
-          title="Pasados"
-          count={pasados.length}
-          defaultOpen={false}
-        >
-          {visiblePasados.map(([dateKey, dayTrips]) => (
-            <div key={dateKey}>
-              <DayDivider dateStr={dateKey} />
-              {dayTrips.map((t) => (
-                <TripRow key={t.id} trip={t} />
-              ))}
-            </div>
-          ))}
+        <>
+          <CollapsibleSection
+            title="Pasados"
+            count={pasados.length}
+            defaultOpen={false}
+          >
+            {visiblePasados.map(([dateKey, dayTrips]) => (
+              <div key={dateKey}>
+                <DayDivider dateStr={dateKey} />
+                {dayTrips.map((t) => (
+                  <TripRow key={t.id} trip={t} />
+                ))}
+              </div>
+            ))}
 
-          <LoadMoreButton
-            hidden={hiddenPasadosDays}
-            total={pasados.length}
-            visible={pasadosVisible}
-            onClick={() => setShowAllPasados(true)}
-          />
-        </CollapsibleSection>
+            <LoadMoreButton
+              hidden={hiddenPasadosDays}
+              total={pasados.length}
+              visible={pasadosVisible}
+              onClick={() => setShowAllPasados(true)}
+            />
+          </CollapsibleSection>
+
+          {pasadosMeta && (
+            <Pagination
+              page={pasadosMeta.page}
+              totalPages={pasadosMeta.totalPages}
+              total={pasadosMeta.total}
+              paramName="pagePasados"
+            />
+          )}
+        </>
       )}
     </div>
   );

@@ -126,3 +126,77 @@ export async function listTripRequestsByCompany(
     select:  tripRequestSelect,
   }) as unknown as TripRequestWithRelations[];
 }
+
+// ---------------------------------------------------------------------------
+// Paginated reads — used by list pages
+// ---------------------------------------------------------------------------
+
+type PagedResult = { data: TripRequestWithRelations[]; total: number };
+
+/** EMPRESA: future solicitudes (requestedDate > now), ascending. */
+export async function listActivasByRequesterPaginated(
+  companyId:     string,
+  requestedById: string,
+  skip:          number,
+  take:          number,
+): Promise<PagedResult> {
+  const now   = new Date();
+  const where = { companyId, requestedById, requestedDate: { gt: now } };
+  const [data, total] = await Promise.all([
+    prisma.tripRequest.findMany({ where, orderBy: { requestedDate: "asc" }, skip, take, select: tripRequestSelect }),
+    prisma.tripRequest.count({ where }),
+  ]);
+  return { data: data as unknown as TripRequestWithRelations[], total };
+}
+
+/** EMPRESA: past solicitudes (requestedDate <= now), descending. */
+export async function listHistorialByRequesterPaginated(
+  companyId:     string,
+  requestedById: string,
+  skip:          number,
+  take:          number,
+): Promise<PagedResult> {
+  const now   = new Date();
+  const where = { companyId, requestedById, requestedDate: { lte: now } };
+  const [data, total] = await Promise.all([
+    prisma.tripRequest.findMany({ where, orderBy: { requestedDate: "desc" }, skip, take, select: tripRequestSelect }),
+    prisma.tripRequest.count({ where }),
+  ]);
+  return { data: data as unknown as TripRequestWithRelations[], total };
+}
+
+/** PROVEEDOR: PENDING requests with future requestedDate (actionable), ascending. */
+export async function listPendingByCompanyPaginated(
+  companyId: string,
+  skip:      number,
+  take:      number,
+): Promise<PagedResult> {
+  const now   = new Date();
+  const where = { companyId, status: "PENDING" as TripRequestStatus, requestedDate: { gt: now } };
+  const [data, total] = await Promise.all([
+    prisma.tripRequest.findMany({ where, orderBy: { requestedDate: "asc" }, skip, take, select: tripRequestSelect }),
+    prisma.tripRequest.count({ where }),
+  ]);
+  return { data: data as unknown as TripRequestWithRelations[], total };
+}
+
+/** PROVEEDOR: historial = resolved OR expired PENDING (requestedDate <= now), descending. */
+export async function listHistorialByCompanyPaginated(
+  companyId: string,
+  skip:      number,
+  take:      number,
+): Promise<PagedResult> {
+  const now   = new Date();
+  const where = {
+    companyId,
+    OR: [
+      { status: { not: "PENDING" as TripRequestStatus } },
+      { status: "PENDING" as TripRequestStatus, requestedDate: { lte: now } },
+    ],
+  };
+  const [data, total] = await Promise.all([
+    prisma.tripRequest.findMany({ where, orderBy: { requestedDate: "desc" }, skip, take, select: tripRequestSelect }),
+    prisma.tripRequest.count({ where }),
+  ]);
+  return { data: data as unknown as TripRequestWithRelations[], total };
+}

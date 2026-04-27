@@ -1,7 +1,10 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { Suspense }     from "react";
+import { redirect }     from "next/navigation";
+import Link             from "next/link";
+import { auth }         from "@/lib/auth";
+import { prisma }       from "@/lib/prisma";
+import { getPageParam, buildPaginationMeta, PAGE_SIZE } from "@/lib/pagination";
+import { Pagination }   from "@/components/ui/Pagination";
 
 // Color coding for the seat grid cells.
 const SLOT_COLORS = {
@@ -11,55 +14,64 @@ const SLOT_COLORS = {
   CANCELLED: "bg-slate-200",
 } as const;
 
-export default async function UablViajes() {
+export default async function UablViajes({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
+  const sp = await searchParams;
   const { companyId, departmentId } = session.user;
 
-  // Fetch upcoming trips with their slot summaries for this department.
-  const [trips, pastTrips] = await Promise.all([
+  const { page: pageProximos, skip: skipProximos } = getPageParam(sp, "pageProximos");
+  const { page: pagePasados,  skip: skipPasados  } = getPageParam(sp, "pagePasados");
+
+  const upcomingWhere = {
+    companyId,
+    status:        { in: ["SCHEDULED", "BOARDING", "DELAYED"] as const },
+    departureTime: { gte: new Date() },
+  };
+  const pastWhere = { companyId, viajeStatus: "PASADO" as const };
+
+  const slotFilter = departmentId ? { departmentId } : {};
+
+  const [trips, tripsTotal, pastTrips, pastTotal] = await Promise.all([
     prisma.trip.findMany({
-      where: {
-        companyId,
-        status: { in: ["SCHEDULED", "BOARDING", "DELAYED"] },
-        departureTime: { gte: new Date() },
-      },
+      where:   upcomingWhere,
       select: {
         id:            true,
         departureTime: true,
         capacity:      true,
         boat:          { select: { name: true } },
         branch:        { select: { name: true } },
-        passengerSlots: {
-          where: departmentId ? { departmentId } : {},
-          select: { id: true, status: true },
-        },
+        passengerSlots: { where: slotFilter, select: { id: true, status: true } },
       },
       orderBy: { departureTime: "asc" },
-      take: 20,
+      skip:    skipProximos,
+      take:    PAGE_SIZE,
     }),
-    // Completed trips (viajeStatus = PASADO) — for ficha download.
+    prisma.trip.count({ where: upcomingWhere }),
     prisma.trip.findMany({
-      where: {
-        companyId,
-        viajeStatus: "PASADO",
-      },
+      where:   pastWhere,
       select: {
         id:            true,
         departureTime: true,
         capacity:      true,
         boat:          { select: { name: true } },
         branch:        { select: { name: true } },
-        passengerSlots: {
-          where: departmentId ? { departmentId } : {},
-          select: { id: true, status: true },
-        },
+        passengerSlots: { where: slotFilter, select: { id: true, status: true } },
       },
       orderBy: { departureTime: "desc" },
-      take: 20,
+      skip:    skipPasados,
+      take:    PAGE_SIZE,
     }),
+    prisma.trip.count({ where: pastWhere }),
   ]);
+
+  const metaProximos = buildPaginationMeta(tripsTotal, pageProximos);
+  const metaPasados  = buildPaginationMeta(pastTotal,  pagePasados);
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 space-y-10">
@@ -85,7 +97,7 @@ export default async function UablViajes() {
           ))}
         </div>
 
-        {trips.length === 0 ? (
+        {trips.length === 0 && pageProximos === 1 ? (
           <div className="py-12 text-center text-sm text-muted-foreground">
             No hay viajes programados próximamente.
           </div>
@@ -145,10 +157,19 @@ export default async function UablViajes() {
             })}
           </ul>
         )}
+
+        <Suspense fallback={null}>
+          <Pagination
+            page={pageProximos}
+            totalPages={metaProximos.totalPages}
+            total={tripsTotal}
+            paramName="pageProximos"
+          />
+        </Suspense>
       </section>
 
       {/* ── Completed trips ───────────────────────────────────────────────── */}
-      {pastTrips.length > 0 && (
+      {(pastTrips.length > 0 || pagePasados > 1) && (
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Viajes completados</h2>
@@ -213,6 +234,15 @@ export default async function UablViajes() {
               );
             })}
           </ul>
+
+          <Suspense fallback={null}>
+            <Pagination
+              page={pagePasados}
+              totalPages={metaPasados.totalPages}
+              total={pastTotal}
+              paramName="pagePasados"
+            />
+          </Suspense>
         </section>
       )}
     </main>

@@ -1,8 +1,11 @@
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { Suspense }   from "react";
+import { redirect }   from "next/navigation";
+import Link           from "next/link";
+import { auth }       from "@/lib/auth";
+import { prisma }     from "@/lib/prisma";
 import { Plus, ChevronRight } from "lucide-react";
+import { getPageParam, buildPaginationMeta, PAGE_SIZE } from "@/lib/pagination";
+import { Pagination } from "@/components/ui/Pagination";
 
 type StatusCfg = { label: string; color: string };
 const STATUS_LABELS_DEFAULT: StatusCfg = { label: "Borrador", color: "bg-slate-100 text-slate-600" };
@@ -14,7 +17,22 @@ const STATUS_LABELS: Record<string, StatusCfg> = {
   CANCELLED: { label: "Cancelado",  color: "bg-red-100 text-red-600" },
 };
 
-export default async function MisReservas() {
+function formatDeparture(d: Date) {
+  return d.toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday:  "short",
+    day:      "numeric",
+    month:    "short",
+    hour:     "2-digit",
+    minute:   "2-digit",
+  });
+}
+
+export default async function MisReservas({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
@@ -28,35 +46,49 @@ export default async function MisReservas() {
     );
   }
 
-  // Single query: bookings with their trip included for departureTime ordering.
-  const bookings = await prisma.groupBooking.findMany({
-    where:   { companyId: session.user.companyId, employerId: session.user.employerId },
-    include: { trip: { select: { departureTime: true, boat: { select: { name: true } } } } },
-    orderBy: { createdAt: "desc" },
-  });
-
+  const sp  = await searchParams;
   const now = new Date();
 
-  // Separate into upcoming (departureTime > now) and past, capped at 20 for history.
-  const proximas = bookings
-    .filter((b) => b.trip && b.trip.departureTime > now)
-    .sort((a, b) => a.trip!.departureTime.getTime() - b.trip!.departureTime.getTime());
+  const { page: pageProximas,  skip: skipProximas  } = getPageParam(sp, "pageProximas");
+  const { page: pageHistorial, skip: skipHistorial } = getPageParam(sp, "pageHistorial");
 
-  const historial = bookings
-    .filter((b) => !b.trip || b.trip.departureTime <= now)
-    .sort((a, b) => (b.trip?.departureTime.getTime() ?? 0) - (a.trip?.departureTime.getTime() ?? 0))
-    .slice(0, 20);
+  const baseWhere = {
+    companyId:  session.user.companyId,
+    employerId: session.user.employerId,
+  };
+  const bookingSelect = {
+    id:     true,
+    status: true,
+    trip: { select: { departureTime: true, boat: { select: { name: true } } } },
+  };
 
-  function formatDeparture(d: Date) {
-    return d.toLocaleString("es-AR", {
-      timeZone: "America/Argentina/Buenos_Aires",
-      weekday:  "short",
-      day:      "numeric",
-      month:    "short",
-      hour:     "2-digit",
-      minute:   "2-digit",
-    });
-  }
+  const [proximas, proximasTotal, historial, historialTotal] = await Promise.all([
+    prisma.groupBooking.findMany({
+      where:   { ...baseWhere, trip: { departureTime: { gt: now } } },
+      select:  bookingSelect,
+      orderBy: { trip: { departureTime: "asc" } },
+      skip:    skipProximas,
+      take:    PAGE_SIZE,
+    }),
+    prisma.groupBooking.count({
+      where: { ...baseWhere, trip: { departureTime: { gt: now } } },
+    }),
+    prisma.groupBooking.findMany({
+      where:   { ...baseWhere, trip: { departureTime: { lte: now } } },
+      select:  bookingSelect,
+      orderBy: { trip: { departureTime: "desc" } },
+      skip:    skipHistorial,
+      take:    PAGE_SIZE,
+    }),
+    prisma.groupBooking.count({
+      where: { ...baseWhere, trip: { departureTime: { lte: now } } },
+    }),
+  ]);
+
+  const metaProximas  = buildPaginationMeta(proximasTotal,  pageProximas);
+  const metaHistorial = buildPaginationMeta(historialTotal, pageHistorial);
+
+  const isEmpty = proximasTotal === 0 && historialTotal === 0;
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10 space-y-8">
@@ -76,11 +108,17 @@ export default async function MisReservas() {
         </Link>
       </div>
 
+      {isEmpty && (
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          Todavía no creaste ninguna reserva.
+        </div>
+      )}
+
       {/* Próximas reservas */}
-      {proximas.length > 0 && (
+      {(proximas.length > 0 || pageProximas > 1) && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Próximas ({proximas.length})
+            Próximas ({proximasTotal})
           </h2>
           <ul className="space-y-3">
             {proximas.map((booking) => {
@@ -107,20 +145,22 @@ export default async function MisReservas() {
               );
             })}
           </ul>
+          <Suspense fallback={null}>
+            <Pagination
+              page={pageProximas}
+              totalPages={metaProximas.totalPages}
+              total={proximasTotal}
+              paramName="pageProximas"
+            />
+          </Suspense>
         </section>
       )}
 
-      {proximas.length === 0 && historial.length === 0 && (
-        <div className="py-12 text-center text-sm text-muted-foreground">
-          Todavía no creaste ninguna reserva.
-        </div>
-      )}
-
       {/* Historial */}
-      {historial.length > 0 && (
+      {(historial.length > 0 || pageHistorial > 1) && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Historial (últimas {historial.length})
+            Historial ({historialTotal})
           </h2>
           <ul className="space-y-3">
             {historial.map((booking) => {
@@ -149,6 +189,14 @@ export default async function MisReservas() {
               );
             })}
           </ul>
+          <Suspense fallback={null}>
+            <Pagination
+              page={pageHistorial}
+              totalPages={metaHistorial.totalPages}
+              total={historialTotal}
+              paramName="pageHistorial"
+            />
+          </Suspense>
         </section>
       )}
     </main>
