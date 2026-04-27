@@ -16,6 +16,7 @@ import { BienvenidaEmail }                from "@/emails/BienvenidaEmail";
 import { ResetPasswordEmail }            from "@/emails/ResetPasswordEmail";
 import { ConductorEmail }               from "@/emails/ConductorEmail";
 import { EmailMensualDepartamento }     from "@/emails/EmailMensualDepartamento";
+import { prisma }                        from "@/lib/prisma";
 
 // ---------------------------------------------------------------------------
 // Config — read env vars lazily inside each function, NOT at module level.
@@ -239,6 +240,101 @@ export async function sendEmailMensualDepartamento(
     Sentry.captureException(err, { tags: { service: "email", type: "mensual-departamento" }, extra: { to: params.email, departamento: params.departamento } });
     throw err; // re-throw so the caller can track errores count
   }
+}
+
+// ---------------------------------------------------------------------------
+// enviarResumenMensualEmpresa
+// ---------------------------------------------------------------------------
+//
+// Sends the monthly liquidation summary email to every department in a company
+// that has emailContacto configured.
+//
+// Used by:
+//   - /api/emails/mensual route (admin-triggered, authenticated)
+//   - /api/jobs/cierre-mensual job (cron-triggered, X-Job-Secret)
+//
+// Returns counts instead of throwing, so orchestrators can track partial
+// success across multiple companies.
+
+const MONTH_NAMES_EMAIL = [
+  "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+  "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre",
+];
+
+function prevMonthEmail(mes: number, anio: number): { mes: number; anio: number } {
+  return mes === 1 ? { mes: 12, anio: anio - 1 } : { mes: mes - 1, anio };
+}
+
+export type ResumenMensualEmailResult = { enviados: number; omitidos: number; errores: number };
+
+export async function enviarResumenMensualEmpresa(
+  companyId: string,
+  mes:       number,
+  anio:      number,
+): Promise<ResumenMensualEmailResult> {
+  const prev      = prevMonthEmail(mes, anio);
+  const mesLabel  = `${MONTH_NAMES_EMAIL[mes - 1] ?? `Mes ${mes}`} ${anio}`;
+
+  const [company, departments] = await Promise.all([
+    prisma.company.findUnique({ where: { id: companyId }, select: { name: true } }),
+    prisma.department.findMany({
+      where:   { companyId, isActive: true },
+      select:  { id: true, name: true, emailContacto: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  const companyName = company?.name ?? "HarborFlow";
+
+  let enviados = 0;
+  let omitidos = 0;
+  let errores  = 0;
+
+  for (const dept of departments) {
+    if (!dept.emailContacto) {
+      omitidos++;
+      continue;
+    }
+
+    const [liquidaciones, prevLiquidaciones] = await Promise.all([
+      prisma.asientoLiquidacion.findMany({
+        where:  { companyId, departamentoId: dept.id, mes, anio },
+        select: { asientosReservados: true, fraccionVacios: true, totalAsientos: true },
+      }),
+      prisma.asientoLiquidacion.findMany({
+        where:  { companyId, departamentoId: dept.id, mes: prev.mes, anio: prev.anio },
+        select: { totalAsientos: true },
+      }),
+    ]);
+
+    const totalViajes    = liquidaciones.length;
+    const asientosUsados = liquidaciones.reduce((s, l) => s + l.asientosReservados, 0);
+    const asientosVacios = liquidaciones.reduce((s, l) => s + Number(l.fraccionVacios), 0);
+    const totalAsientos  = liquidaciones.reduce((s, l) => s + Number(l.totalAsientos), 0);
+    const prevTotal      = prevLiquidaciones.reduce((s, l) => s + Number(l.totalAsientos), 0);
+    const variacionAsientos = prevLiquidaciones.length > 0
+      ? Math.round((totalAsientos - prevTotal) * 100) / 100
+      : undefined;
+
+    try {
+      await sendEmailMensualDepartamento({
+        departamento:     dept.name,
+        email:            dept.emailContacto,
+        mes:              mesLabel,
+        totalViajes,
+        asientosUsados,
+        asientosVacios,
+        totalAsientos,
+        variacionAsientos,
+        companyName,
+      });
+      enviados++;
+    } catch {
+      errores++;
+    }
+  }
+
+  return { enviados, omitidos, errores };
 }
 
 // ---------------------------------------------------------------------------

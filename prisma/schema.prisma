@@ -204,6 +204,8 @@ enum AuditAction {
   // ── V2: Conductor operations ──────────────────────────────────────────────
   CONDUCTOR_CHECKIN
   SALIDA_CONFIRMADA
+  // ── V2: Monthly close ─────────────────────────────────────────────────────
+  CIERRE_MENSUAL_COMPLETADO
 }
 
 /// Status lifecycle for on-demand boat requests submitted by EMPRESA.
