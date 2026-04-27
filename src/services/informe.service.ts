@@ -19,6 +19,7 @@
 // =============================================================================
 
 import Anthropic     from "@anthropic-ai/sdk";
+import * as Sentry   from "@sentry/nextjs";
 import { prisma }    from "@/lib/prisma";
 import { detectarAnomalias } from "./anomalias.service";
 import { logAction } from "@/modules/audit/repository";
@@ -141,7 +142,9 @@ export async function generarInformeNarrativo(input: GenerarInformeInput) {
   // ── 3. Call Claude API ────────────────────────────────────────────────────
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const message = await anthropic.messages.create({
+  let message: Awaited<ReturnType<typeof anthropic.messages.create>>;
+  try {
+    message = await anthropic.messages.create({
     model:      "claude-sonnet-4-6",
     max_tokens: 1024,
     system:
@@ -163,7 +166,14 @@ export async function generarInformeNarrativo(input: GenerarInformeInput) {
         content: `Datos operativos reales:\n\n${context}\n\nRedactá el informe ejecutivo mensual.`,
       },
     ],
-  });
+    });
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags:  { service: "claude-api", action: "informe-narrativo" },
+      extra: { companyId, mes, anio },
+    });
+    throw err;
+  }
 
   const contenido =
     message.content[0]?.type === "text"

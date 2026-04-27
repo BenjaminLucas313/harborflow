@@ -10,6 +10,7 @@
 // =============================================================================
 
 import nodemailer              from "nodemailer";
+import * as Sentry             from "@sentry/nextjs";
 import { render }              from "@react-email/render";
 import { BienvenidaEmail }                from "@/emails/BienvenidaEmail";
 import { ResetPasswordEmail }            from "@/emails/ResetPasswordEmail";
@@ -87,6 +88,7 @@ export async function sendBienvenida(params: BienvenidaParams): Promise<void> {
     console.log("[email:bienvenida] ✓ sent successfully →", params.email);
   } catch (err) {
     console.error("[email:bienvenida] ✗ SMTP error:", err);
+    Sentry.captureException(err, { tags: { service: "email", type: "bienvenida" }, extra: { to: params.email } });
   }
 }
 
@@ -160,6 +162,7 @@ export async function sendEmailConductor(params: ConductorEmailParams): Promise<
     console.log("[email:conductor] ✓ sent successfully →", params.email);
   } catch (err) {
     console.error("[email:conductor] ✗ SMTP error:", err);
+    Sentry.captureException(err, { tags: { service: "email", type: "conductor" }, extra: { to: params.email } });
   }
 }
 
@@ -233,6 +236,7 @@ export async function sendEmailMensualDepartamento(
     console.log("[email:mensual-dept] ✓ sent →", params.email);
   } catch (err) {
     console.error("[email:mensual-dept] ✗ SMTP error:", err);
+    Sentry.captureException(err, { tags: { service: "email", type: "mensual-departamento" }, extra: { to: params.email, departamento: params.departamento } });
     throw err; // re-throw so the caller can track errores count
   }
 }
@@ -276,5 +280,6 @@ export async function sendResetPassword(params: ResetPasswordParams): Promise<vo
     console.log("[email:reset-password] ✓ sent successfully →", params.email);
   } catch (err) {
     console.error("[email:reset-password] ✗ SMTP error:", err);
+    Sentry.captureException(err, { tags: { service: "email", type: "reset-password" }, extra: { to: params.email } });
   }
 }

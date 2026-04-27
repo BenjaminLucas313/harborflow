@@ -5,6 +5,7 @@ import { getLocale, getMessages } from "next-intl/server";
 import { SessionProvider } from "next-auth/react";
 import { LoadingProvider } from "@/components/ui/LoadingProvider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { SentryUserIdentifier } from "@/components/providers/sentry-user-identifier";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,6 +31,7 @@ export default async function RootLayout({
     <html lang={locale} className={inter.variable} suppressHydrationWarning>
       <body className="antialiased">
         <SessionProvider>
+          <SentryUserIdentifier />
           <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
             <NextIntlClientProvider messages={messages}>
               <LoadingProvider>{children}</LoadingProvider>

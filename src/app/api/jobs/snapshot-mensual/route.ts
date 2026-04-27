@@ -23,6 +23,7 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry                   from "@sentry/nextjs";
 import { prisma }                    from "@/lib/prisma";
 import { generarSnapshotMensual }    from "@/services/snapshot.service";
 
@@ -83,6 +84,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error(`[snapshot-mensual] ERROR ${company.name}:`, err);
+        Sentry.captureException(err, {
+          tags:  { job: "snapshot-mensual" },
+          extra: { companyId: company.id, companyName: company.name, mes, anio },
+        });
         return { companyId: company.id, companyName: company.name, ok: false as const, error: message };
       }
     }),

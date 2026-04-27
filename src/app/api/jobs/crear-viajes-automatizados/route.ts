@@ -24,6 +24,7 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry                   from "@sentry/nextjs";
 import { prisma }                    from "@/lib/prisma";
 import { logAction }                 from "@/modules/audit/repository";
 
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // ── Main logic ────────────────────────────────────────────────────────────────
+  try {
   // ── Find all template trips ──────────────────────────────────────────────────
   //
   // Key design decisions:
@@ -160,4 +163,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   console.log(`[crear-viajes-automatizados] templates=${templates.length} created=${created} skipped=${skipped}`);
   return NextResponse.json({ data: { created, skipped } });
+  } catch (err) {
+    console.error("[crear-viajes-automatizados] unexpected error:", err);
+    Sentry.captureException(err, { tags: { job: "crear-viajes-automatizados" } });
+    return NextResponse.json(
+      { error: { code: "INTERNAL_ERROR", message: "Error interno del servidor." } },
+      { status: 500 },
+    );
+  }
 }

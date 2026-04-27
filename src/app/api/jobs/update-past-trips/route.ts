@@ -30,6 +30,7 @@
 // =============================================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { updatePastTrips } from "@/lib/jobs/update-past-trips";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ data: result });
   } catch (err) {
     console.error("[/api/jobs/update-past-trips] unexpected error:", err);
+    Sentry.captureException(err, { tags: { job: "update-past-trips" } });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Error interno del servidor." } },
       { status: 500 },

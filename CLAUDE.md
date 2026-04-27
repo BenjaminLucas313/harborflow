@@ -374,6 +374,18 @@ npm run snapshot:generar
 cross-env MES=3 ANIO=2026 npm run snapshot:generar
 ```
 
+## Observabilidad (Sentry)
+
+- Sentry está configurado para producción únicamente (`enabled: NODE_ENV === "production"`)
+- En desarrollo los errores **NO** se envían a Sentry — solo se loguean en consola
+- `captureException` está integrado en: jobs automáticos, email service, Claude API
+- `SentryUserIdentifier` identifica al usuario autenticado en cada error reportado
+- Variables requeridas en producción:
+  - `NEXT_PUBLIC_SENTRY_DSN` — DSN del proyecto (expuesta al cliente)
+  - `SENTRY_AUTH_TOKEN` — token para subir source maps en el build
+  - `SENTRY_ORG` — slug de la organización en sentry.io
+  - `SENTRY_PROJECT` — slug del proyecto en sentry.io
+
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.
