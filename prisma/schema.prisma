@@ -750,12 +750,33 @@ model Trip {
   /// Liquidation records for this trip (one per department that had seats).
   asientosLiquidacion AsientoLiquidacion[]
   conductorCheckins   ConductorCheckin[]
+  stops               TripStop[]
 
   @@index([branchId, departureTime, status])
   @@index([companyId, departureTime])
   @@index([companyId, status])
   /// Query trips eligible for liquidation calculation.
   @@index([companyId, viajeStatus, liquidacionCalculada])
+}
+
+// =============================================================================
+// TRIP STOPS — Ordered list of waypoints for a trip route
+// =============================================================================
+
+/// An ordered waypoint on a trip's route.
+/// order=0 is always the departure point; order=N is the final destination.
+/// Intermediate stops (0 < order < N) are optional.
+/// Trips without stops have no explicit route (legacy or unspecified).
+model TripStop {
+  id     String @id @default(cuid())
+  tripId String
+  /// Zero-based position in the route. 0 = origin, last = destination.
+  order  Int
+  name   String
+
+  trip Trip @relation(fields: [tripId], references: [id])
+
+  @@index([tripId, order])
 }
 
 // =============================================================================

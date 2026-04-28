@@ -6,6 +6,7 @@ import { prisma }              from "@/lib/prisma";
 import { SlotStatus }          from "@prisma/client";
 import { ChecklistClient }     from "@/components/conductor/checklist-client";
 import type { PassengerRow }   from "@/components/conductor/checklist-client";
+import { TripStopTimeline }    from "@/components/trips/trip-stop-timeline";
 
 const ARG_TZ = "America/Argentina/Buenos_Aires";
 
@@ -48,6 +49,7 @@ export default async function ConductorChecklist({
       salidaConfirmadaAt:  true,
       boat:   { select: { name: true } },
       branch: { select: { name: true } },
+      stops:  { select: { order: true, name: true }, orderBy: { order: "asc" as const } },
     },
   });
 
@@ -138,6 +140,8 @@ export default async function ConductorChecklist({
           <dd className="mt-0.5 text-sm font-semibold">{slots.length} / {trip.capacity}</dd>
         </div>
       </dl>
+
+      {trip.stops.length > 0 && <TripStopTimeline stops={trip.stops} />}
 
       {/* Interactive checklist */}
       <ChecklistClient

@@ -2,6 +2,13 @@
 import { z } from "zod";
 import { TripStatus } from "@prisma/client";
 
+export const TripStopInputSchema = z.object({
+  order: z.number().int().min(0),
+  name: z.string().min(1, "El nombre de la parada es obligatorio.").max(100).trim(),
+});
+
+export type TripStopInput = z.infer<typeof TripStopInputSchema>;
+
 export const CreateTripSchema = z.object({
   companyId: z.string().optional(), // always overridden from session server-side
   branchId: z.string(),
@@ -17,6 +24,8 @@ export const CreateTripSchema = z.object({
     .string()
     .regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido")
     .optional(),
+  /** Ordered list of route waypoints. Min 2 if provided (origin + destination). */
+  stops: z.array(TripStopInputSchema).min(2, "Se requieren al menos 2 paradas (origen y destino).").optional(),
 }).refine(
   (d) => !d.automatizado || !!d.horaRecurrente,
   { message: "horaRecurrente es requerida cuando automatizado es true", path: ["horaRecurrente"] },
@@ -42,6 +51,7 @@ export const UpdateTripSchema = z.object({
     .string()
     .regex(/^\d{2}:\d{2}$/, "Formato HH:MM requerido")
     .optional(),
+  stops: z.array(TripStopInputSchema).min(2).optional(),
 });
 
 export type CreateTripInput = z.infer<typeof CreateTripSchema>;

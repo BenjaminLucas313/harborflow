@@ -14,7 +14,8 @@
     "snapshot:generar": "cross-env MES=anterior tsx --env-file=.env src/scripts/generar-snapshot.ts",
     "viajes:automatizar": "cross-env tsx --env-file=.env -e \"fetch('http://localhost:3000/api/jobs/crear-viajes-automatizados',{method:'POST',headers:{'x-job-secret':process.env.JOB_SECRET??''}}).then(r=>r.json()).then(console.log)\"",
     "usuarios:cargar": "tsx --env-file=.env src/scripts/cargar-usuarios-excel.ts",
-    "usuarios:ejemplo": "tsx src/scripts/generar-ejemplo-usuarios.ts"
+    "usuarios:ejemplo": "tsx src/scripts/generar-ejemplo-usuarios.ts",
+    "trips:migrar-rutas": "tsx --env-file=.env src/scripts/migrar-rutas-desde-trip-requests.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",

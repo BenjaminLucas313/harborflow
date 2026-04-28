@@ -3,13 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
+
+type StopItem = { id: number; name: string };
 
 type Props = {
   boats:    { id: string; name: string; capacity: number }[];
   drivers:  { id: string; firstName: string; lastName: string }[];
   branches: { id: string; name: string }[];
 };
+
+let stopIdCounter = 0;
+function newStop(name = ""): StopItem {
+  return { id: ++stopIdCounter, name };
+}
 
 export function NewTripForm({ boats, drivers, branches }: Props) {
   const router = useRouter();
@@ -26,6 +33,32 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
   const [loading,         setLoading]         = useState(false);
   const [error,           setError]           = useState<string | null>(null);
   const [fieldErrors,     setFieldErrors]     = useState<Record<string, string>>({});
+
+  // Stops: first and last are always origin/destination; middle ones are intermediates.
+  const [stops, setStops] = useState<StopItem[]>(() => [newStop(), newStop()]);
+
+  function updateStop(id: number, name: string) {
+    setStops((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)));
+  }
+
+  function addIntermediateStop() {
+    setStops((prev) => {
+      const next = [...prev];
+      next.splice(next.length - 1, 0, newStop());
+      return next;
+    });
+  }
+
+  function removeStop(id: number) {
+    setStops((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  // Build the stops payload only if at least origin and destination are filled.
+  function buildStopsPayload() {
+    const filled = stops.filter((s) => s.name.trim() !== "");
+    if (filled.length < 2) return undefined;
+    return stops.map((s, i) => ({ order: i, name: s.name.trim() })).filter((s) => s.name !== "");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +84,7 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
         waitlistEnabled:      waitlist,
         automatizado,
         horaRecurrente:       automatizado ? horaRecurrente : undefined,
+        stops:                buildStopsPayload(),
       }),
     });
 
@@ -129,6 +163,56 @@ export function NewTripForm({ boats, drivers, branches }: Props) {
             className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           {fieldErrors.estimatedArrivalTime && <p className="text-xs text-red-600">{fieldErrors.estimatedArrivalTime}</p>}
         </div>
+      </div>
+
+      {/* ── Recorrido ──────────────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Recorrido <span className="text-xs font-normal text-muted-foreground">(opcional)</span></p>
+        <div className="space-y-0">
+          {stops.map((stop, idx) => {
+            const isFirst = idx === 0;
+            const isLast  = idx === stops.length - 1;
+            const isIntermediate = !isFirst && !isLast;
+            return (
+              <div key={stop.id} className="flex gap-2">
+                {/* Timeline column */}
+                <div className="flex flex-col items-center w-5 shrink-0 pt-2.5">
+                  <div className={`size-3 rounded-full shrink-0 ${isFirst ? "bg-emerald-500" : isLast ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                  {!isLast && <div className="w-px flex-1 bg-border my-1 min-h-3" />}
+                </div>
+                {/* Input row */}
+                <div className="flex-1 pb-1">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={stop.name}
+                      onChange={(e) => updateStop(stop.id, e.target.value)}
+                      placeholder={isFirst ? "Punto de salida" : isLast ? "Punto de llegada" : `Parada ${idx}`}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    {isIntermediate && (
+                      <button
+                        type="button"
+                        onClick={() => removeStop(stop.id)}
+                        className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        aria-label="Eliminar parada"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={addIntermediateStop}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors pl-7"
+        >
+          <Plus className="size-3.5" /> Agregar parada intermedia
+        </button>
       </div>
 
       <div className="space-y-1">

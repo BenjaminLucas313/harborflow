@@ -27,6 +27,7 @@ const TRIP_SELECT = {
   updatedAt: true,
   boat: { select: { id: true, name: true } },
   driver: { select: { id: true, firstName: true, lastName: true } },
+  stops: { select: { order: true, name: true }, orderBy: { order: "asc" as const } },
 } satisfies Prisma.TripSelect;
 
 export type TripRow = Prisma.TripGetPayload<{ select: typeof TRIP_SELECT }>;
@@ -46,6 +47,8 @@ const NON_TERMINAL_STATUSES: TripStatus[] = [
 // Write
 // ---------------------------------------------------------------------------
 
+export type StopData = { order: number; name: string };
+
 export type CreateTripData = {
   companyId: string;
   branchId: string;
@@ -59,6 +62,7 @@ export type CreateTripData = {
   notes?: string;
   automatizado?: boolean;
   horaRecurrente?: string;
+  stops?: StopData[];
 };
 
 export async function createTrip(data: CreateTripData): Promise<TripRow> {
@@ -75,6 +79,9 @@ export async function createTrip(data: CreateTripData): Promise<TripRow> {
       notes: data.notes,
       automatizado: data.automatizado ?? false,
       horaRecurrente: data.horaRecurrente,
+      stops: data.stops?.length
+        ? { createMany: { data: data.stops } }
+        : undefined,
     },
     select: TRIP_SELECT,
   });

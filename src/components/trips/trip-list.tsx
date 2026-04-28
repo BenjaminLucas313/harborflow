@@ -7,6 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { Ship } from "lucide-react";
 import type { TripRow } from "@/modules/trips/repository";
 import { TripStatus } from "@prisma/client";
+import { getTripRoute } from "@/lib/trip-utils";
 
 // ---------------------------------------------------------------------------
 // Status badge classes
@@ -93,6 +94,9 @@ export async function TripList({ trips }: Props) {
                     ? `${trip.driver.firstName} ${trip.driver.lastName}`
                     : t("list.noDriver")}
                 </p>
+                <p className={trip.stops.length === 0 ? "italic text-muted-foreground/60" : ""}>
+                  {getTripRoute(trip.stops)}
+                </p>
                 {trip.estimatedArrivalTime && (
                   <p className="text-xs">
                     {t("list.arrival")}:{" "}
@@ -116,6 +120,7 @@ export async function TripList({ trips }: Props) {
                   "arrival",
                   "boat",
                   "driver",
+                  "route",
                   "capacity",
                   "status",
                 ] as const
@@ -156,6 +161,9 @@ export async function TripList({ trips }: Props) {
                   ) : (
                     <span className="italic">{t("list.noDriver")}</span>
                   )}
+                </td>
+                <td className={`px-4 py-3 whitespace-nowrap text-sm ${trip.stops.length === 0 ? "text-muted-foreground/50 italic" : "text-muted-foreground"}`}>
+                  {getTripRoute(trip.stops)}
                 </td>
                 <td className="px-4 py-3 text-center tabular-nums">
                   {trip.capacity}

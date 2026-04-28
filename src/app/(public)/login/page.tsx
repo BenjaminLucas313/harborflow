@@ -17,6 +17,8 @@ export default async function LoginPage() {
       className="relative flex min-h-svh items-center justify-center px-4 py-12"
       style={{ background: "#020009" }}
     >
+      {/* Cubre las zonas de overscroll/safe-area de Safari */}
+      <div aria-hidden="true" style={{ position: "fixed", inset: 0, background: "#020009", zIndex: -1 }} />
       {/* LineWaves background — z:0 */}
       <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <LineWavesBackground

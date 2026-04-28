@@ -14,8 +14,9 @@ import { prisma } from "@/lib/prisma";
 import { logAction } from "@/modules/audit/repository";
 import { cancelTrip } from "@/modules/trips/service";
 import { AppError } from "@/lib/errors";
-import { crearNotificacion }    from "@/modules/notificaciones/service";
+import { crearNotificacion }   from "@/modules/notificaciones/service";
 import { sendEmailConductor }  from "@/services/email.service";
+import { getTripRoute }        from "@/lib/trip-utils";
 
 function formatArgDateForEmail(date: Date): string {
   const dateStr = date.toLocaleDateString("es-AR", {
@@ -100,9 +101,9 @@ export async function PATCH(
     select: {
       id: true, status: true, automatizado: true,
       boatId: true, branchId: true, horaRecurrente: true, departureTime: true,
-      capacity:    true,
-      boat:        { select: { name: true } },
-      tripRequest: { select: { origin: true, destination: true } },
+      capacity: true,
+      boat:     { select: { name: true } },
+      stops:    { select: { order: true, name: true }, orderBy: { order: "asc" } },
     },
   });
   if (!existing) {
@@ -170,10 +171,7 @@ export async function PATCH(
           const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
           const fecha  = formatArgDateForEmail(existing.departureTime);
           const lancha = `${existing.boat?.name ?? "Lancha"} — ${existing.capacity} asientos`;
-          const ruta   =
-            existing.tripRequest?.origin && existing.tripRequest?.destination
-              ? `${existing.tripRequest.origin} → ${existing.tripRequest.destination}`
-              : "Ruta no especificada";
+          const ruta = getTripRoute(existing.stops ?? []);
 
           await sendEmailConductor({
             nombre:       driverWithUser.user.firstName,

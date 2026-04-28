@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { TripStatusManager } from "@/components/proveedor/trip-status-manager";
 import { ConductorSelector } from "@/components/proveedor/conductor-selector";
 import type { ConductorOption } from "@/components/proveedor/conductor-selector";
+import { TripStopTimeline } from "@/components/trips/trip-stop-timeline";
 
 const STATUS_LABEL: Record<string, string> = {
   SCHEDULED: "Programado",
@@ -61,6 +62,7 @@ export default async function ProveedorTripDetail({
       boat:    { select: { name: true } },
       branch:  { select: { name: true } },
       driver:  { select: { firstName: true, lastName: true } },
+      stops:   { select: { order: true, name: true }, orderBy: { order: "asc" as const } },
       passengerSlots: {
         select: {
           id:     true,
@@ -167,6 +169,12 @@ export default async function ProveedorTripDetail({
             <dd className="text-sm font-medium text-yellow-700">{pendingCount}</dd>
           </div>
         </dl>
+
+        {trip.stops.length > 0 && (
+          <div className="mt-4">
+            <TripStopTimeline stops={trip.stops} />
+          </div>
+        )}
 
         {trip.notes && (
           <div className="rounded-xl border bg-amber-50 border-amber-200 p-3 text-sm text-amber-800">

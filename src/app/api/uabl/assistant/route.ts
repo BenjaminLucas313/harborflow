@@ -18,6 +18,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getAdminMetrics, getEficienciaMetrics } from "@/modules/metrics/admin-service";
+import { getTripRoute } from "@/lib/trip-utils";
 
 // ---------------------------------------------------------------------------
 // Rate limiter — in-memory, per user, resets on deploy (V1 acceptable)
@@ -129,8 +130,7 @@ type ViajeProximo = {
   hora:        string;
   boatName:    string;
   driverName:  string | null;
-  origin:      string | null;
-  destination: string | null;
+  ruta:        string;
   status:      string;
   confirmados: number;
   capacidad:   number;
@@ -169,9 +169,9 @@ async function getViajesProximos(
       departureTime: true,
       capacity:      true,
       status:        true,
-      boat:          { select: { name: true } },
-      driver:        { select: { firstName: true, lastName: true } },
-      tripRequest:   { select: { origin: true, destination: true } },
+      boat:   { select: { name: true } },
+      driver: { select: { firstName: true, lastName: true } },
+      stops:  { select: { order: true, name: true }, orderBy: { order: "asc" as const } },
     },
     orderBy: { departureTime: "asc" },
   });
@@ -209,8 +209,7 @@ async function getViajesProximos(
     hora:        toArgTime(t.departureTime),
     boatName:    t.boat.name,
     driverName:  t.driver ? `${t.driver.firstName} ${t.driver.lastName}` : null,
-    origin:      t.tripRequest?.origin  ?? null,
-    destination: t.tripRequest?.destination ?? null,
+    ruta:        getTripRoute(t.stops),
     status:      t.status,
     confirmados: totalMap.get(t.id) ?? 0,
     capacidad:   t.capacity,
@@ -343,7 +342,7 @@ function buildContext(
   const fmtViaje = (v: ViajeProximo): string => {
     let line = `- ${v.hora} hs | ${v.boatName}`;
     if (v.driverName) line += ` | Chofer: ${v.driverName}`;
-    if (v.origin && v.destination) line += ` | Ruta: ${v.origin} → ${v.destination}`;
+    if (v.ruta !== "Ruta no especificada") line += ` | Ruta: ${v.ruta}`;
     line += ` | ${v.confirmados}/${v.capacidad} pasajeros | Estado: ${v.status}`;
     if (v.porDepto.length > 0) {
       line += `\n  Por depto: ${v.porDepto.map((d) => `${d.nombre} ×${d.count}`).join(", ")}`;

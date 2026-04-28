@@ -29,7 +29,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} className={inter.variable} suppressHydrationWarning>
-      <body className="antialiased">
+      <body className="antialiased min-h-svh">
         <SessionProvider>
           <SentryUserIdentifier />
           <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>

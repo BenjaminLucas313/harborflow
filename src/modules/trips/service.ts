@@ -104,6 +104,7 @@ export async function createTrip(
     notes: tripInput.notes,
     automatizado: tripInput.automatizado,
     horaRecurrente: tripInput.horaRecurrente,
+    stops: tripInput.stops,
   });
 
   // 4. Audit trail — non-blocking best-effort; failure logged, not surfaced.
