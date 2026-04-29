@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileDown } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { TripStatusManager } from "@/components/proveedor/trip-status-manager";
@@ -126,11 +126,22 @@ export default async function ProveedorTripDetail({
             <h1 className="text-2xl font-semibold tracking-tight">{trip.boat.name}</h1>
             <p className="text-sm text-muted-foreground mt-0.5 capitalize">{dep}</p>
           </div>
-          <span
-            className={`rounded-full px-3 py-1 text-sm font-medium shrink-0 ${STATUS_COLOR[trip.status] ?? "bg-slate-100 text-slate-600"}`}
-          >
-            {STATUS_LABEL[trip.status] ?? trip.status}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={`/api/trips/${trip.id}/planilla`}
+              download
+              className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              aria-label="Descargar planilla de pasajeros en PDF"
+            >
+              <FileDown className="size-4" aria-hidden="true" />
+              Planilla PDF
+            </a>
+            <span
+              className={`rounded-full px-3 py-1 text-sm font-medium ${STATUS_COLOR[trip.status] ?? "bg-slate-100 text-slate-600"}`}
+            >
+              {STATUS_LABEL[trip.status] ?? trip.status}
+            </span>
+          </div>
         </div>
 
         {/* Trip details grid */}

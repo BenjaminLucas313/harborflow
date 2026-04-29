@@ -3,7 +3,9 @@
     "allow": [
       "Bash(python -m graphify . --no-viz)",
       "Bash(npx tsc *)",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "Bash(psql \"postgresql://harborflow:harborflow@localhost:5432/harborflow_dev\" -c \"SELECT t.id, t.\\\\\"departureTime\\\\\", t.status, b.name as boat FROM \\\\\"Trip\\\\\" t JOIN \\\\\"Boat\\\\\" b ON b.id = t.\\\\\"boatId\\\\\" ORDER BY t.\\\\\"createdAt\\\\\" DESC LIMIT 5;\")",
+      "Bash(npx prisma *)"
     ]
   }
 }

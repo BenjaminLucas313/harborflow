@@ -5,6 +5,7 @@ import { listSlotsByTrip } from "@/modules/passenger-slots/service";
 import { SlotReviewCard } from "@/components/uabl/slot-review-card";
 import { SeatGrid } from "@/components/trips/seat-grid";
 import { TripHistorial } from "@/components/trips/TripHistorial";
+import { FileDown } from "lucide-react";
 
 export default async function TripDetail({
   params,
@@ -71,31 +72,43 @@ export default async function TripDetail({
           <p className="text-sm text-muted-foreground">{departure} · {trip.branch.name}</p>
         </div>
 
-        {isCompleted && (
+        <div className="flex items-center gap-2 shrink-0">
           <a
-            href={`/api/viajes/${trip.id}/pdf`}
+            href={`/api/trips/${trip.id}/planilla`}
             download
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
-            aria-label="Descargar ficha de viaje en PDF"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            aria-label="Descargar planilla de pasajeros en PDF"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="size-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Descargar ficha
+            <FileDown className="size-4" aria-hidden="true" />
+            Planilla PDF
           </a>
-        )}
+
+          {isCompleted && (
+            <a
+              href={`/api/viajes/${trip.id}/pdf`}
+              download
+              className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              aria-label="Descargar ficha de viaje en PDF"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Ficha PDF
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Past-trip warning — disables slot review actions */}

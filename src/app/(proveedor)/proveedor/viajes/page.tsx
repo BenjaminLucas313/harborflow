@@ -8,8 +8,8 @@ import { ViajesGrouped }  from "@/components/proveedor/viajes-grouped";
 import type { TripItem }  from "@/components/proveedor/viajes-grouped";
 import { getPageParam, buildPaginationMeta, PAGE_SIZE } from "@/lib/pagination";
 
-// Statuses that count as an occupied seat.
-const ACTIVE_SLOT_STATUSES: SlotStatus[] = ["PENDING", "CONFIRMED"];
+// Only CONFIRMED slots count as occupied seats in the listing display.
+const ACTIVE_SLOT_STATUSES: SlotStatus[] = ["CONFIRMED"];
 
 export default async function ProveedorViajes({
   searchParams,

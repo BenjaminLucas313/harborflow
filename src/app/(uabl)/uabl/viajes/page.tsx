@@ -105,8 +105,9 @@ export default async function UablViajes({
         ) : (
           <ul className="space-y-4">
             {trips.map((trip) => {
-              const slots   = trip.passengerSlots;
-              const pending = slots.filter((s) => s.status === "PENDING").length;
+              const slots     = trip.passengerSlots;
+              const confirmed = slots.filter((s) => s.status === "CONFIRMED").length;
+              const pending   = slots.filter((s) => s.status === "PENDING").length;
 
               const departure = new Date(trip.departureTime).toLocaleString("es-AR", {
                 timeZone: "America/Argentina/Buenos_Aires",
@@ -130,7 +131,7 @@ export default async function UablViajes({
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-sm text-muted-foreground">
-                          {slots.length} / {trip.capacity} slots
+                          {confirmed} / {trip.capacity} confirmados
                         </p>
                         {pending > 0 && (
                           <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">

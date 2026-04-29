@@ -24,7 +24,7 @@ export default async function EmpresaViajes() {
       branch:        { select: { name: true } },
       _count: {
         select: {
-          passengerSlots: { where: { status: { in: ["PENDING", "CONFIRMED"] } } },
+          passengerSlots: { where: { status: "CONFIRMED" } },
         },
       },
     },

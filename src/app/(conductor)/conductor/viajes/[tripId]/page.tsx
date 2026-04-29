@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link                    from "next/link";
-import { ArrowLeft }           from "lucide-react";
+import { ArrowLeft, FileDown } from "lucide-react";
 import { auth }                from "@/lib/auth";
 import { prisma }              from "@/lib/prisma";
 import { SlotStatus }          from "@prisma/client";
@@ -142,6 +142,17 @@ export default async function ConductorChecklist({
       </dl>
 
       {trip.stops.length > 0 && <TripStopTimeline stops={trip.stops} />}
+
+      {/* Planilla PDF — prominent pre-departure download */}
+      <a
+        href={`/api/trips/${tripId}/planilla`}
+        download
+        className="flex items-center justify-center gap-2 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+        aria-label="Descargar planilla de pasajeros en PDF"
+      >
+        <FileDown className="size-5" aria-hidden="true" />
+        Descargar planilla de pasajeros
+      </a>
 
       {/* Interactive checklist */}
       <ChecklistClient
