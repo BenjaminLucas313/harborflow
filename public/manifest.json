@@ -1,0 +1,22 @@
+{
+  "name": "HarborFlow",
+  "short_name": "HarborFlow",
+  "description": "Sistema de gestión operativa portuaria",
+  "start_url": "/conductor",
+  "display": "standalone",
+  "background_color": "#0d1b35",
+  "theme_color": "#0d1b35",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/HarborLogo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/HarborLogo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

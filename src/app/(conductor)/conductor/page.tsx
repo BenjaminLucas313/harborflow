@@ -4,6 +4,7 @@ import { auth }       from "@/lib/auth";
 import { prisma }     from "@/lib/prisma";
 import { SlotStatus } from "@prisma/client";
 import { Anchor, CalendarClock, ClipboardList, Clock, Users } from "lucide-react";
+import { InstallBanner } from "@/components/conductor/install-banner";
 
 const ARG_TZ = "America/Argentina/Buenos_Aires";
 
@@ -125,6 +126,9 @@ export default async function ConductorPage() {
 
   return (
     <main className="mx-auto max-w-[480px] px-4 py-6 space-y-6">
+
+      {/* ── PWA install prompt — only rendered when browser fires beforeinstallprompt ── */}
+      <InstallBanner />
 
       {/* ── Próximo viaje ─────────────────────────────────────────────── */}
       <section>

@@ -6,8 +6,8 @@
 //   - Live "X / Y presentes" counter
 //   - Departure confirmation via POST /api/conductor/confirmar-salida
 
-import { useState } from "react";
-import { CheckCircle2, Circle, Loader2, Users } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { CheckCircle2, Circle, Loader2, Users, WifiOff } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +48,34 @@ export function ChecklistClient({
   const [confirmed,   setConfirmed]   = useState(initialConfirmada);
   const [confirmedAt, setConfirmedAt] = useState<string | null>(initialConfirmadaAt);
   const [error,       setError]       = useState<string | null>(null);
+  const [isOnline,    setIsOnline]    = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true
+  );
+  // Queued mutations that failed due to network loss — flushed on reconnect.
+  const pendingRef = useRef<Map<string, boolean>>(new Map());
+
+  useEffect(() => {
+    const on = () => {
+      setIsOnline(true);
+      // Flush pending offline check-in changes
+      pendingRef.current.forEach((presente, userId) => {
+        fetch("/api/conductor/checkin", {
+          method:  "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ tripId, userId, presente }),
+        })
+          .then((res) => { if (res.ok) pendingRef.current.delete(userId); })
+          .catch(() => { /* stays queued for next reconnect */ });
+      });
+    };
+    const off = () => setIsOnline(false);
+    window.addEventListener("online",  on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online",  on);
+      window.removeEventListener("offline", off);
+    };
+  }, [tripId]);
 
   const presentCount = Object.values(checkins).filter(Boolean).length;
   const total        = passengers.length;
@@ -60,13 +88,19 @@ export function ChecklistClient({
   async function handleToggle(userId: string) {
     if (confirmed) return;
 
-    const prev    = checkins[userId] ?? false;
-    const next    = !prev;
+    const prev = checkins[userId] ?? false;
+    const next = !prev;
 
-    // Optimistic update
+    // Optimistic update — always applied immediately
     setCheckins((c) => ({ ...c, [userId]: next }));
-    setLoadingIds((s) => new Set(s).add(userId));
 
+    if (!isOnline) {
+      // Queue for sync on reconnect; no spinner needed
+      pendingRef.current.set(userId, next);
+      return;
+    }
+
+    setLoadingIds((s) => new Set(s).add(userId));
     try {
       const res = await fetch("/api/conductor/checkin", {
         method:  "PATCH",
@@ -74,18 +108,19 @@ export function ChecklistClient({
         body:    JSON.stringify({ tripId, userId, presente: next }),
       });
       if (!res.ok) {
-        // Revert on failure
+        // Server rejected — revert
         setCheckins((c) => ({ ...c, [userId]: prev }));
         const json = await res.json().catch(() => ({})) as { error?: { message: string } };
         setError(json.error?.message ?? "Error al actualizar presencia.");
       } else {
         setError(null);
+        pendingRef.current.delete(userId);
       }
     } catch {
-      setCheckins((c) => ({ ...c, [userId]: prev }));
-      setError("Error de red. Intentá de nuevo.");
+      // Network failure while nominally online — keep optimistic state, queue sync
+      pendingRef.current.set(userId, next);
     } finally {
-      setLoadingIds((s) => { const next = new Set(s); next.delete(userId); return next; });
+      setLoadingIds((s) => { const n = new Set(s); n.delete(userId); return n; });
     }
   }
 
@@ -132,6 +167,19 @@ export function ChecklistClient({
 
   return (
     <div className="space-y-4">
+
+      {/* ── Offline banner ───────────────────────────────────────────── */}
+      {!isOnline && (
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+        >
+          <WifiOff className="size-4 shrink-0 text-amber-600" aria-hidden="true" />
+          <p className="text-sm text-amber-800">
+            Sin conexión — los cambios se guardarán cuando vuelva la señal.
+          </p>
+        </div>
+      )}
 
       {/* ── Live counter ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between rounded-xl bg-muted/60 px-4 py-3">

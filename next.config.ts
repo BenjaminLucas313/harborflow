@@ -2,6 +2,25 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { withSentryConfig } from "@sentry/nextjs";
 
+// next-pwa is CJS with no bundled types — require() is the safest import path
+// in a TypeScript config file to avoid ESM/CJS resolution conflicts.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const withPWA = require("next-pwa") as (options: {
+  dest: string;
+  disable?: boolean;
+  register?: boolean;
+  skipWaiting?: boolean;
+  fallbacks?: { document?: string };
+  runtimeCaching?: Array<{
+    urlPattern: RegExp | string;
+    handler: string;
+    options?: {
+      cacheName?: string;
+      expiration?: { maxEntries?: number; maxAgeSeconds?: number };
+    };
+  }>;
+}) => (config: NextConfig) => NextConfig;
+
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
@@ -14,7 +33,33 @@ const nextConfig: NextConfig = {
   transpilePackages: ["react-markdown", "three"],
 };
 
-export default withSentryConfig(withNextIntl(nextConfig), {
+const withPWAConfig = withPWA({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === "development",
+  fallbacks: { document: "/offline" },
+  runtimeCaching: [
+    {
+      urlPattern: /^https?.*(\/conductor\/viajes\/.*)/,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "conductor-viajes",
+        expiration: { maxEntries: 20, maxAgeSeconds: 24 * 60 * 60 },
+      },
+    },
+    {
+      urlPattern: /^https?.*(\/api\/conductor\/.*)/,
+      handler: "NetworkFirst",
+      options: {
+        cacheName: "conductor-api",
+        expiration: { maxEntries: 30, maxAgeSeconds: 24 * 60 * 60 },
+      },
+    },
+  ],
+});
+
+export default withSentryConfig(withNextIntl(withPWAConfig(nextConfig)), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
