@@ -12,15 +12,13 @@ function isTripToday(iso: string): boolean {
   return dep === now;
 }
 
-function formatDepartureFull(iso: string): string {
-  return new Date(iso).toLocaleString("es-AR", {
+// "lunes 5 de mayo" — no year, no time, as specified
+function formatDepartureShort(iso: string): string {
+  return new Date(iso).toLocaleDateString("es-AR", {
     timeZone: TZ,
-    weekday:  "long",
-    day:      "numeric",
-    month:    "long",
-    year:     "numeric",
-    hour:     "2-digit",
-    minute:   "2-digit",
+    weekday: "long",
+    day:     "numeric",
+    month:   "long",
   });
 }
 
@@ -29,13 +27,21 @@ function formatDepartureFull(iso: string): string {
 // ---------------------------------------------------------------------------
 
 type ModalProps = {
-  departureTime: string;
-  onConfirm:     () => void;
-  onCancel:      () => void;
+  departureTime:  string;
+  boatName:       string;
+  availableSeats: number;
+  onConfirm:      () => void;
+  onCancel:       () => void;
 };
 
-function FechaFuturaModal({ departureTime, onConfirm, onCancel }: ModalProps) {
-  const fecha = formatDepartureFull(departureTime);
+function FechaFuturaModal({
+  departureTime,
+  boatName,
+  availableSeats,
+  onConfirm,
+  onCancel,
+}: ModalProps) {
+  const fechaCorta = formatDepartureShort(departureTime);
 
   return (
     <div
@@ -48,7 +54,7 @@ function FechaFuturaModal({ departureTime, onConfirm, onCancel }: ModalProps) {
     >
       <div className="animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-200 motion-reduce:animate-none relative w-full max-w-sm rounded-2xl bg-card border border-border shadow-2xl overflow-hidden">
 
-        {/* Amber header bar */}
+        {/* Amber header */}
         <div className="bg-amber-50 border-b border-amber-100 px-6 pt-6 pb-5 text-center space-y-3">
           <div className="flex justify-center">
             <div className="rounded-2xl bg-amber-100 p-4 shadow-sm">
@@ -60,37 +66,35 @@ function FechaFuturaModal({ departureTime, onConfirm, onCancel }: ModalProps) {
               Este viaje no es para hoy
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Estás a punto de reservar un viaje futuro
+              {boatName}
+              {" · "}
+              {availableSeats} lugar{availableSeats !== 1 ? "es" : ""} disponible{availableSeats !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
 
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
-          <div
+          <p
             id="modal-desc"
-            className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-4 text-center space-y-1"
+            className="text-sm text-center text-muted-foreground leading-relaxed"
           >
-            <p className="text-xs font-medium text-amber-700 uppercase tracking-wide">
-              Fecha del viaje
-            </p>
-            <p className="text-base font-semibold capitalize leading-snug">
-              {fecha}
-            </p>
-          </div>
-
-          <p className="text-sm text-center text-muted-foreground leading-relaxed">
-            ¿Querés continuar con la reserva de todos modos?
+            El viaje para el cual estás a punto de reservar no es para hoy, es
+            para{" "}
+            <span className="font-semibold text-foreground capitalize">
+              {fechaCorta}
+            </span>
+            . ¿Seguro que querés continuar?
           </p>
 
           {/* Action buttons */}
-          <div className="flex flex-col-reverse sm:flex-row gap-2.5">
+          <div className="flex flex-col-reverse sm:flex-row gap-2.5 pt-1">
             <button
               type="button"
               onClick={onCancel}
               className="flex-1 rounded-xl border border-border bg-background px-4 py-3 text-sm font-medium hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              Cancelar
+              Volver
             </button>
             <button
               type="button"
@@ -122,12 +126,19 @@ function FechaFuturaModal({ departureTime, onConfirm, onCancel }: ModalProps) {
 // ---------------------------------------------------------------------------
 
 type Props = {
-  tripId:        string;
-  departureTime: string; // ISO string from the server
+  tripId:         string;
+  departureTime:  string; // ISO string serialized by the server component
+  availableSeats: number;
+  boatName:       string;
 };
 
-export function ReservarViajeButton({ tripId, departureTime }: Props) {
-  const router    = useRouter();
+export function ReservarViajeButton({
+  tripId,
+  departureTime,
+  availableSeats,
+  boatName,
+}: Props) {
+  const router      = useRouter();
   const [open, setOpen] = useState(false);
 
   const destination = `/empresa/reservas/nueva?tripId=${tripId}`;
@@ -153,6 +164,8 @@ export function ReservarViajeButton({ tripId, departureTime }: Props) {
       {open && (
         <FechaFuturaModal
           departureTime={departureTime}
+          boatName={boatName}
+          availableSeats={availableSeats}
           onConfirm={() => { setOpen(false); router.push(destination); }}
           onCancel={() => setOpen(false)}
         />

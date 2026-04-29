@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Ship, Users } from "lucide-react";
+import { ReservarViajeButton } from "@/components/empresa/reservar-viaje-button";
 
 export default async function EmpresaViajes() {
   const session = await auth();
@@ -114,12 +114,12 @@ export default async function EmpresaViajes() {
                   </div>
 
                   {!full && portOpen ? (
-                    <Link
-                      href={`/empresa/reservas/nueva?tripId=${trip.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                    >
-                      Crear reserva grupal
-                    </Link>
+                    <ReservarViajeButton
+                      tripId={trip.id}
+                      departureTime={trip.departureTime.toISOString()}
+                      availableSeats={available}
+                      boatName={trip.boat.name}
+                    />
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       {full ? "Sin lugares disponibles." : "Puerto cerrado."}

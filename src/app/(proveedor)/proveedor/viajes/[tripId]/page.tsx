@@ -7,6 +7,7 @@ import { TripStatusManager } from "@/components/proveedor/trip-status-manager";
 import { ConductorSelector } from "@/components/proveedor/conductor-selector";
 import type { ConductorOption } from "@/components/proveedor/conductor-selector";
 import { TripStopTimeline } from "@/components/trips/trip-stop-timeline";
+import { TripHistorial } from "@/components/trips/TripHistorial";
 
 const STATUS_LABEL: Record<string, string> = {
   SCHEDULED: "Programado",
@@ -232,6 +233,14 @@ export default async function ProveedorTripDetail({
           </ul>
         )}
       </div>
+
+      {/* Audit history */}
+      <section aria-labelledby="historial-heading" className="space-y-4">
+        <h2 id="historial-heading" className="font-semibold text-base">
+          Historial de cambios
+        </h2>
+        <TripHistorial tripId={tripId} />
+      </section>
     </main>
   );
 }

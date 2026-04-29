@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { listSlotsByTrip } from "@/modules/passenger-slots/service";
 import { SlotReviewCard } from "@/components/uabl/slot-review-card";
 import { SeatGrid } from "@/components/trips/seat-grid";
+import { TripHistorial } from "@/components/trips/TripHistorial";
 
 export default async function TripDetail({
   params,
@@ -151,6 +152,14 @@ export default async function TripDetail({
           ))}
         </ul>
       )}
+
+      {/* Audit history */}
+      <section aria-labelledby="historial-heading" className="space-y-4 pt-4">
+        <h2 id="historial-heading" className="text-base font-semibold">
+          Historial de cambios
+        </h2>
+        <TripHistorial tripId={tripId} />
+      </section>
     </main>
   );
 }
