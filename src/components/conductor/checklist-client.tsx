@@ -5,9 +5,98 @@
 //   - Optimistic checkbox toggle via PATCH /api/conductor/checkin
 //   - Live "X / Y presentes" counter
 //   - Departure confirmation via POST /api/conductor/confirmar-salida
+//   - Offline persistence: unsynced check-ins survive page close via IndexedDB
 
 import { useState, useEffect, useRef } from "react";
 import { CheckCircle2, Circle, Loader2, Users, WifiOff } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// IndexedDB helpers — durable offline storage for unsynced check-ins
+// ---------------------------------------------------------------------------
+
+const IDB_NAME    = "harborflow-conductor";
+const IDB_VERSION = 1;
+const IDB_STORE   = "checkins";
+
+type IDBCheckin = {
+  tripId:    string;
+  userId:    string;
+  presente:  boolean;
+  timestamp: number;
+  synced:    boolean;
+};
+
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = (e.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE, { keyPath: ["tripId", "userId"] });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function saveCheckInLocally(tripId: string, userId: string, presente: boolean): Promise<void> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx    = db.transaction(IDB_STORE, "readwrite");
+      const store = tx.objectStore(IDB_STORE);
+      const req   = store.put({ tripId, userId, presente, timestamp: Date.now(), synced: false });
+      req.onsuccess = () => resolve();
+      req.onerror   = () => reject(req.error);
+    });
+  } catch {
+    // IDB unavailable (private mode, etc.) — silent fallback to in-memory queue
+  }
+}
+
+async function markSyncedInDB(tripId: string, userId: string): Promise<void> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx      = db.transaction(IDB_STORE, "readwrite");
+      const store   = tx.objectStore(IDB_STORE);
+      const getReq  = store.get([tripId, userId]);
+      getReq.onsuccess = () => {
+        if (getReq.result) {
+          store.put({ ...getReq.result as IDBCheckin, synced: true });
+        }
+        resolve();
+      };
+      getReq.onerror = () => resolve();
+    });
+  } catch { /* silent */ }
+}
+
+async function getPendingFromDB(tripId: string): Promise<IDBCheckin[]> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx    = db.transaction(IDB_STORE, "readonly");
+      const store = tx.objectStore(IDB_STORE);
+      const all: IDBCheckin[] = [];
+      const cursor = store.openCursor();
+      cursor.onsuccess = (e) => {
+        const c = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+        if (c) {
+          const rec = c.value as IDBCheckin;
+          if (rec.tripId === tripId && !rec.synced) all.push(rec);
+          c.continue();
+        } else {
+          resolve(all);
+        }
+      };
+      cursor.onerror = () => resolve([]);
+    });
+  } catch {
+    return [];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,25 +143,60 @@ export function ChecklistClient({
   // Queued mutations that failed due to network loss — flushed on reconnect.
   const pendingRef = useRef<Map<string, boolean>>(new Map());
 
+  // On mount: sync any unsynced IDB records from a previous session.
   useEffect(() => {
-    const on = () => {
+    if (typeof indexedDB === "undefined") return;
+    getPendingFromDB(tripId).then((pending) => {
+      for (const rec of pending) {
+        fetch("/api/conductor/checkin", {
+          method:  "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ tripId: rec.tripId, userId: rec.userId, presente: rec.presente }),
+        })
+          .then((res) => { if (res.ok) markSyncedInDB(rec.tripId, rec.userId).catch(() => {}); })
+          .catch(() => { /* will retry on next mount or reconnect */ });
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripId]);
+
+  useEffect(() => {
+    const flushAll = () => {
       setIsOnline(true);
-      // Flush pending offline check-in changes
+      // Flush in-memory queue (same session, fast path)
       pendingRef.current.forEach((presente, userId) => {
         fetch("/api/conductor/checkin", {
           method:  "PATCH",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({ tripId, userId, presente }),
         })
-          .then((res) => { if (res.ok) pendingRef.current.delete(userId); })
+          .then((res) => {
+            if (res.ok) {
+              pendingRef.current.delete(userId);
+              markSyncedInDB(tripId, userId).catch(() => {});
+            }
+          })
           .catch(() => { /* stays queued for next reconnect */ });
       });
+      // Also flush IDB records (cross-session, previous page loads)
+      getPendingFromDB(tripId).then((pending) => {
+        for (const rec of pending) {
+          if (pendingRef.current.has(rec.userId)) continue; // already handled above
+          fetch("/api/conductor/checkin", {
+            method:  "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ tripId: rec.tripId, userId: rec.userId, presente: rec.presente }),
+          })
+            .then((res) => { if (res.ok) markSyncedInDB(rec.tripId, rec.userId).catch(() => {}); })
+            .catch(() => {});
+        }
+      }).catch(() => {});
     };
     const off = () => setIsOnline(false);
-    window.addEventListener("online",  on);
+    window.addEventListener("online",  flushAll);
     window.addEventListener("offline", off);
     return () => {
-      window.removeEventListener("online",  on);
+      window.removeEventListener("online",  flushAll);
       window.removeEventListener("offline", off);
     };
   }, [tripId]);

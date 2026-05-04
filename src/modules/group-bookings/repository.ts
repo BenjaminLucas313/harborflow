@@ -14,25 +14,44 @@ export async function findGroupBookingById(
   });
 }
 
+export type PaginatedGroupBookings<T> = { items: T[]; total: number };
+
 export async function listGroupBookingsByEmployer(
   companyId: string,
   employerId: string,
-): Promise<GroupBooking[]> {
-  return prisma.groupBooking.findMany({
-    where:   { companyId, employerId },
-    orderBy: { createdAt: "desc" },
-  });
+  pagination?: { page?: number; limit?: number },
+): Promise<PaginatedGroupBookings<GroupBooking>> {
+  const page  = Math.max(1, pagination?.page  ?? 1);
+  const limit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  const skip  = (page - 1) * limit;
+  const where = { companyId, employerId };
+  const [items, total] = await prisma.$transaction([
+    prisma.groupBooking.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: limit }),
+    prisma.groupBooking.count({ where }),
+  ]);
+  return { items, total };
 }
 
 export async function listGroupBookingsByTrip(
   companyId: string,
   tripId: string,
-): Promise<GroupBookingWithSlots[]> {
-  return prisma.groupBooking.findMany({
-    where:   { companyId, tripId },
-    include: { passengerSlots: true },
-    orderBy: { createdAt: "desc" },
-  });
+  pagination?: { page?: number; limit?: number },
+): Promise<PaginatedGroupBookings<GroupBookingWithSlots>> {
+  const page  = Math.max(1, pagination?.page  ?? 1);
+  const limit = Math.min(100, Math.max(1, pagination?.limit ?? 20));
+  const skip  = (page - 1) * limit;
+  const where = { companyId, tripId };
+  const [items, total] = await prisma.$transaction([
+    prisma.groupBooking.findMany({
+      where,
+      include: { passengerSlots: true },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.groupBooking.count({ where }),
+  ]);
+  return { items, total };
 }
 
 export async function createGroupBooking(data: {

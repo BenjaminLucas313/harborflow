@@ -98,22 +98,44 @@ export type ListTripsFilter = {
   dayEnd?: Date;
   /** If omitted, defaults to NON_TERMINAL_STATUSES. */
   status?: TripStatus;
+  /** 1-based page number. Defaults to 1. */
+  page?: number;
+  /** Page size. Defaults to 20, max 100. */
+  limit?: number;
+};
+
+export type PaginatedTrips = {
+  trips: TripRow[];
+  total: number;
 };
 
 export async function listTripsByBranch(
   filter: ListTripsFilter,
-): Promise<TripRow[]> {
-  return prisma.trip.findMany({
-    where: {
-      branchId: filter.branchId,
-      ...(filter.dayStart && filter.dayEnd
-        ? { departureTime: { gte: filter.dayStart, lt: filter.dayEnd } }
-        : {}),
-      status: filter.status ? filter.status : { in: NON_TERMINAL_STATUSES },
-    },
-    select: TRIP_SELECT,
-    orderBy: { createdAt: "desc" },
-  });
+): Promise<PaginatedTrips> {
+  const page  = Math.max(1, filter.page ?? 1);
+  const limit = Math.min(100, Math.max(1, filter.limit ?? 20));
+  const skip  = (page - 1) * limit;
+
+  const where = {
+    branchId: filter.branchId,
+    ...(filter.dayStart && filter.dayEnd
+      ? { departureTime: { gte: filter.dayStart, lt: filter.dayEnd } }
+      : {}),
+    status: filter.status ? filter.status : { in: NON_TERMINAL_STATUSES },
+  };
+
+  const [trips, total] = await prisma.$transaction([
+    prisma.trip.findMany({
+      where,
+      select:  TRIP_SELECT,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take:    limit,
+    }),
+    prisma.trip.count({ where }),
+  ]);
+
+  return { trips, total };
 }
 
 /** Tenant-scoped single-trip lookup. Returns null if not found or wrong company. */

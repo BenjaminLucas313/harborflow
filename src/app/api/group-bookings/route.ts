@@ -77,6 +77,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     const { searchParams } = new URL(req.url);
     const tripId = searchParams.get("tripId");
+    const page   = Math.max(1, parseInt(searchParams.get("page")  ?? "1",  10) || 1);
+    const limit  = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10) || 20));
 
     if (session.user.role === "UABL") {
       if (!tripId) {
@@ -85,19 +87,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
           { status: 400 },
         );
       }
-      const bookings = await listGroupBookingsByTrip(session.user.companyId, tripId);
-      return NextResponse.json(bookings);
+      const { items, total } = await listGroupBookingsByTrip(session.user.companyId, tripId, { page, limit });
+      return NextResponse.json({ data: items, total, page, totalPages: Math.ceil(total / limit) });
     }
 
     // EMPRESA: own employer's bookings
     if (!session.user.employerId) {
-      return NextResponse.json([], { status: 200 });
+      return NextResponse.json({ data: [], total: 0, page: 1, totalPages: 0 }, { status: 200 });
     }
-    const bookings = await listGroupBookingsByEmployer(
+    const { items, total } = await listGroupBookingsByEmployer(
       session.user.companyId,
       session.user.employerId,
+      { page, limit },
     );
-    return NextResponse.json(bookings);
+    return NextResponse.json({ data: items, total, page, totalPages: Math.ceil(total / limit) });
   } catch (err) {
     if (err instanceof AppError) {
       return NextResponse.json(

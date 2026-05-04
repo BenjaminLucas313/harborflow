@@ -10,7 +10,7 @@ import {
   createTrip as repoCreateTrip,
   listTripsByBranch as repoListTripsByBranch,
 } from "./repository";
-import type { TripRow, ListTripsFilter } from "./repository";
+import type { TripRow, ListTripsFilter, PaginatedTrips } from "./repository";
 import type { CreateTripInput } from "./schema";
 
 // ---------------------------------------------------------------------------
@@ -136,14 +136,18 @@ export type ListTripsQuery = {
   date?: Date;
   /** If omitted, defaults to non-terminal statuses (SCHEDULED, BOARDING, DELAYED). */
   status?: TripStatus;
+  page?: number;
+  limit?: number;
 };
 
 export async function listTripsByBranch(
   query: ListTripsQuery,
-): Promise<TripRow[]> {
+): Promise<PaginatedTrips> {
   const filter: ListTripsFilter = {
     branchId: query.branchId,
-    status: query.status,
+    status:   query.status,
+    page:     query.page,
+    limit:    query.limit,
   };
 
   if (query.date) {
@@ -152,7 +156,7 @@ export async function listTripsByBranch(
     const dayEnd = new Date(dayStart);
     dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
     filter.dayStart = dayStart;
-    filter.dayEnd = dayEnd;
+    filter.dayEnd   = dayEnd;
   }
 
   return repoListTripsByBranch(filter);

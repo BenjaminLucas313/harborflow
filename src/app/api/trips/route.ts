@@ -63,9 +63,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     status = statusParam as TripStatus;
   }
 
+  // Pagination — defaults: page=1, limit=20, max limit=100.
+  const page  = Math.max(1, parseInt(searchParams.get("page")  ?? "1",  10) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10) || 20));
+
   try {
-    const trips = await listTripsByBranch({ branchId, date, status });
-    return NextResponse.json({ trips });
+    const { trips, total } = await listTripsByBranch({ branchId, date, status, page, limit });
+    const totalPages = Math.ceil(total / limit);
+    return NextResponse.json({ data: trips, total, page, totalPages });
   } catch (err) {
     if (err instanceof AppError) {
       return NextResponse.json(
