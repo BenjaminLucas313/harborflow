@@ -2,29 +2,40 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { listSlotsByUsuario } from "@/modules/passenger-slots/service";
 import { prisma } from "@/lib/prisma";
-import { CheckCircle2, Clock, XCircle, Ship } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Ship, Hourglass } from "lucide-react";
 
 const STATUS_CONFIG = {
   PENDING: {
     label:  "Pendiente de confirmación",
+    info:   "Tu solicitud está siendo revisada por UABL.",
     icon:   Clock,
     color:  "text-amber-600",
     bg:     "bg-amber-50 border-amber-200",
   },
+  WAITLISTED: {
+    label:  "En lista de espera",
+    info:   "Estás en lista de espera.",
+    icon:   Hourglass,
+    color:  "text-blue-600",
+    bg:     "bg-blue-50 border-blue-200",
+  },
   CONFIRMED: {
     label:  "Confirmado",
+    info:   null,
     icon:   CheckCircle2,
     color:  "text-emerald-600",
     bg:     "bg-emerald-50 border-emerald-200",
   },
   REJECTED: {
     label:  "Rechazado",
+    info:   null,
     icon:   XCircle,
     color:  "text-red-600",
     bg:     "bg-red-50 border-red-200",
   },
   CANCELLED: {
     label:  "Cancelado",
+    info:   null,
     icon:   XCircle,
     color:  "text-slate-500",
     bg:     "bg-slate-50 border-slate-200",
@@ -95,6 +106,11 @@ export default async function MisViajes() {
                   <Icon className="size-4" aria-hidden="true" />
                   {cfg?.label ?? slot.status}
                 </div>
+
+                {/* Informative sub-text for pending/waitlisted states */}
+                {cfg?.info && (
+                  <p className="text-xs text-muted-foreground -mt-1">{cfg.info}</p>
+                )}
 
                 {/* Trip details */}
                 <div className="space-y-1">

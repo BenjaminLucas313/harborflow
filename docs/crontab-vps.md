@@ -40,6 +40,12 @@ Agregar las siguientes líneas (reemplazar `TUDOMINIO` y `TU_SECRET`):
 0 4 * * * curl -s -X POST https://TUDOMINIO/api/jobs/crear-viajes-automatizados \
   -H "X-Job-Secret: TU_SECRET" \
   >> /var/log/harborflow/viajes-auto.log 2>&1
+
+# Limpieza de AuditLog — 1° de cada mes, 00:30 Argentina (03:30 UTC)
+# Elimina registros con más de 12 meses de antigüedad.
+30 3 1 * * curl -s -X POST https://TUDOMINIO/api/jobs/cleanup-audit-log \
+  -H "X-Job-Secret: TU_SECRET" \
+  >> /var/log/harborflow/cleanup-audit-log.log 2>&1
 ```
 
 > **Nota sobre el cierre mensual en días 28-31:**

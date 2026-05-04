@@ -219,8 +219,9 @@ export function ChecklistClient({
     setCheckins((c) => ({ ...c, [userId]: next }));
 
     if (!isOnline) {
-      // Queue for sync on reconnect; no spinner needed
+      // Queue for sync on reconnect; persist to IDB so data survives page close
       pendingRef.current.set(userId, next);
+      saveCheckInLocally(tripId, userId, next).catch(() => {});
       return;
     }
 
@@ -243,6 +244,7 @@ export function ChecklistClient({
     } catch {
       // Network failure while nominally online — keep optimistic state, queue sync
       pendingRef.current.set(userId, next);
+      saveCheckInLocally(tripId, userId, next).catch(() => {});
     } finally {
       setLoadingIds((s) => { const n = new Set(s); n.delete(userId); return n; });
     }
