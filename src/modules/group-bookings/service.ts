@@ -329,9 +329,8 @@ export async function submitGroupBooking(
 }
 
 /**
- * Cancels a GroupBooking. All PENDING slots are also cancelled.
- * CONFIRMED slots are NOT cancelled — their seats are released only if
- * EMPRESA explicitly negotiates with UABL outside the system.
+ * Cancels a GroupBooking. All PENDING and CONFIRMED slots are cancelled,
+ * releasing their seats back to the trip's available capacity.
  */
 export async function cancelGroupBooking(
   bookingId: string,
@@ -351,7 +350,7 @@ export async function cancelGroupBooking(
 
   await prisma.$transaction([
     prisma.passengerSlot.updateMany({
-      where: { groupBookingId: bookingId, status: "PENDING" },
+      where: { groupBookingId: bookingId, status: { in: ["PENDING", "CONFIRMED"] } },
       data:  { status: "CANCELLED" },
     }),
     prisma.groupBooking.update({

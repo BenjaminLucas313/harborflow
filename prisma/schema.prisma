@@ -753,8 +753,10 @@ model Trip {
   stops               TripStop[]
 
   @@index([branchId, departureTime, status])
+  @@index([branchId, status])
   @@index([companyId, departureTime])
   @@index([companyId, status])
+  @@index([driverId])
   /// Query trips eligible for liquidation calculation.
   @@index([companyId, viajeStatus, liquidacionCalculada])
 }

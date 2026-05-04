@@ -65,7 +65,7 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   // Verify the trip exists and belongs to this company.
   const trip = await prisma.trip.findFirst({
     where:  { id: tripId, companyId },
-    select: { id: true, driverId: true, salidaConfirmada: true },
+    select: { id: true, driverId: true, salidaConfirmada: true, status: true, departureTime: true },
   });
   if (!trip) {
     return NextResponse.json(
@@ -79,6 +79,23 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       { data: null, error: { code: "FORBIDDEN", message: "No estás asignado a este viaje." } },
       { status: 403 },
+    );
+  }
+
+  // Cancelled trips cannot receive check-ins.
+  if (trip.status === "CANCELLED") {
+    return NextResponse.json(
+      { data: null, error: { code: "TRIP_CANCELLED", message: "El viaje fue cancelado y no acepta registros de embarque." } },
+      { status: 409 },
+    );
+  }
+
+  // Check-in window: only within 2 hours before departure.
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+  if (new Date(trip.departureTime).getTime() - Date.now() > TWO_HOURS_MS) {
+    return NextResponse.json(
+      { data: null, error: { code: "CHECKIN_TOO_EARLY", message: "El embarque solo puede registrarse hasta 2 horas antes de la salida." } },
+      { status: 409 },
     );
   }
 

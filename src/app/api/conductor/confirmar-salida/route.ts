@@ -108,13 +108,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const now = new Date();
 
-  // Confirm departure on the trip.
+  // Confirm departure on the trip and close its liquidation lifecycle.
   const updated = await prisma.trip.update({
     where: { id: tripId },
     data:  {
       salidaConfirmada:   true,
       salidaConfirmadaAt: now,
       salidaConfirmadaBy: conductorUserId,
+      viajeStatus:        "PASADO",
     },
     select: { salidaConfirmadaAt: true },
   });
