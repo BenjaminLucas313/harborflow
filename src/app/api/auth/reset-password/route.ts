@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z }                         from "zod";
 import bcrypt                        from "bcryptjs";
 import { prisma }                    from "@/lib/prisma";
+import { checkAuthRateLimit }        from "@/lib/auth-rate-limit";
 
 const Schema = z.object({
   token:       z.string().min(1),
@@ -34,6 +35,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { token, newPassword } = parsed.data;
+
+  // Rate-limit by token: prevents brute-forcing token validity at high volume.
+  const { allowed, retryAfter } = checkAuthRateLimit(token, 3, 15 * 60 * 1000);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: { code: "RATE_LIMITED", message: "Demasiados intentos. Intentá de nuevo más tarde." } },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfter) },
+      },
+    );
+  }
 
   try {
     const record = await prisma.passwordResetToken.findUnique({

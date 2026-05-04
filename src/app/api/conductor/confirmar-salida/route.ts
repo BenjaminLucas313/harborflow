@@ -157,6 +157,30 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }).catch(() => {});
 
+  // Notify EMPRESA users who have active GroupBookings on this trip.
+  prisma.user.findMany({
+    where: {
+      companyId,
+      role:     "EMPRESA",
+      isActive: true,
+      groupBookings: {
+        some: { tripId, status: { not: "CANCELLED" } },
+      },
+    },
+    select: { id: true },
+  }).then((empleadores) => {
+    for (const u of empleadores) {
+      crearNotificacion({
+        userId:    u.id,
+        companyId,
+        tipo:      "VIAJE_PARTIO",
+        titulo:    "Viaje en camino",
+        mensaje:   `El viaje del ${depFormatted} en ${trip.boat.name} partió a las ${horaPartida}. Pasajeros: ${presentCount}/${totalSlots} presentes.`,
+        accionUrl: "/empresa/reservas",
+      }).catch(() => {});
+    }
+  }).catch(() => {});
+
   logAction({
     companyId,
     actorId:    conductorUserId,

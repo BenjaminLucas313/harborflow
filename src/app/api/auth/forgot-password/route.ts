@@ -19,12 +19,25 @@ import { z }                         from "zod";
 import { randomUUID }                from "crypto";
 import { prisma }                    from "@/lib/prisma";
 import { sendResetPassword }         from "@/services/email.service";
+import { checkAuthRateLimit }        from "@/lib/auth-rate-limit";
 
 const Schema = z.object({
   email: z.string().email(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const ip = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip") ?? "unknown";
+  const { allowed, retryAfter } = checkAuthRateLimit(ip, 5, 15 * 60 * 1000);
+  if (!allowed) {
+    return NextResponse.json(
+      { ok: true },
+      {
+        status: 429,
+        headers: { "Retry-After": String(retryAfter) },
+      },
+    );
+  }
+
   const body   = await req.json().catch(() => null);
   const parsed = Schema.safeParse(body);
 

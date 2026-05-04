@@ -17,7 +17,7 @@ export const CreateTripSchema = z.object({
   departureTime: z.coerce.date(),
   estimatedArrivalTime: z.coerce.date().optional(),
   waitlistEnabled: z.boolean().default(true),
-  notes: z.string().optional(),
+  notes: z.string().max(500).optional(),
   automatizado: z.boolean().default(false),
   /** "HH:MM" in Argentina local time (UTC-3). Required when automatizado = true. */
   horaRecurrente: z
@@ -45,7 +45,7 @@ export const UpdateTripSchema = z.object({
   departureTime:        z.coerce.date().optional(),
   estimatedArrivalTime: z.coerce.date().optional(),
   waitlistEnabled:      z.boolean().optional(),
-  notes:                z.string().optional(),
+  notes:                z.string().max(500).optional(),
   automatizado:         z.boolean().optional(),
   horaRecurrente:       z
     .string()

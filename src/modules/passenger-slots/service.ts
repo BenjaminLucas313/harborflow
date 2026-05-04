@@ -191,6 +191,18 @@ export async function revertSlot(
     );
   }
 
+  const tripForSlot = await prisma.trip.findUnique({
+    where:  { id: slot.tripId },
+    select: { departureTime: true },
+  });
+  if (tripForSlot && tripForSlot.departureTime <= new Date()) {
+    throw new AppError(
+      "TRIP_DEPARTURE_PAST",
+      "No se puede revertir un slot de un viaje que ya partió.",
+      400,
+    );
+  }
+
   const isReviewer = slot.reviewedById === ctx.actorId;
   if (!isReviewer && !ctx.isUablAdmin) {
     throw new AppError(

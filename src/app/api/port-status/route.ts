@@ -16,7 +16,7 @@ import { crearNotificacion } from "@/modules/notificaciones/service";
 const BodySchema = z.object({
   branchId: z.string().min(1),
   status:   z.enum(Object.values(PortStatusValue) as [string, ...string[]]),
-  message:  z.string().optional(),
+  message:  z.string().max(300).optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
