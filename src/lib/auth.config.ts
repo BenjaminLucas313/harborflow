@@ -33,11 +33,22 @@ export const authConfig = {
         // V2 additions
         token.departmentId       = user.departmentId ?? null;
         token.employerId         = user.employerId ?? null;
+        token.employerName       = user.employerName ?? null;
         token.isUablAdmin        = user.isUablAdmin ?? false;
         token.mustChangePassword = user.mustChangePassword ?? false;
       }
-      if (trigger === "update" && typeof (session as { mustChangePassword?: boolean })?.mustChangePassword === "boolean") {
-        token.mustChangePassword = (session as { mustChangePassword: boolean }).mustChangePassword;
+      if (trigger === "update") {
+        const s = session as {
+          mustChangePassword?: boolean;
+          employerId?:         string | null;
+          employerName?:       string | null;
+        };
+        if (typeof s?.mustChangePassword === "boolean") {
+          token.mustChangePassword = s.mustChangePassword;
+        }
+        // Post-onboarding: EMPRESA user linked their employer without re-login.
+        if ("employerId"   in s) token.employerId   = s.employerId   ?? null;
+        if ("employerName" in s) token.employerName = s.employerName ?? null;
       }
       return token;
     },
@@ -45,16 +56,17 @@ export const authConfig = {
     // Project token claims into the session object available to the app.
     // token.sub is the user.id set automatically by Auth.js.
     session({ session, token }) {
-      session.user.id                = token.sub!;
-      session.user.companyId         = token.companyId as string;
-      session.user.branchId          = token.branchId as string | null;
-      session.user.firstName         = token.firstName as string;
-      session.user.lastName          = token.lastName as string;
-      session.user.role              = token.role as UserRole;
+      session.user.id                 = token.sub!;
+      session.user.companyId          = token.companyId as string;
+      session.user.branchId           = token.branchId as string | null;
+      session.user.firstName          = token.firstName as string;
+      session.user.lastName           = token.lastName as string;
+      session.user.role               = token.role as UserRole;
       // V2 additions
-      session.user.departmentId      = token.departmentId as string | null;
-      session.user.employerId        = token.employerId as string | null;
-      session.user.isUablAdmin       = token.isUablAdmin as boolean;
+      session.user.departmentId       = token.departmentId  as string | null;
+      session.user.employerId         = token.employerId    as string | null;
+      session.user.employerName       = token.employerName  as string | null;
+      session.user.isUablAdmin        = token.isUablAdmin        as boolean;
       session.user.mustChangePassword = token.mustChangePassword as boolean;
       return session;
     },

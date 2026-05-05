@@ -19,6 +19,8 @@ declare module "next-auth" {
       departmentId: string | null;
       /** For EMPRESA users: the employer entity they book on behalf of. */
       employerId: string | null;
+      /** Display name of the employer (EMPRESA/USUARIO). Denormalized from Employer.name. */
+      employerName: string | null;
       /** For UABL users: if true, can manage departments and work types. */
       isUablAdmin: boolean;
       /** If true, user must change password before accessing any other route. */
@@ -36,6 +38,7 @@ declare module "next-auth" {
     // V2 additions
     departmentId: string | null;
     employerId: string | null;
+    employerName: string | null;
     isUablAdmin: boolean;
     mustChangePassword: boolean;
   }
@@ -52,6 +55,7 @@ declare module "next-auth/jwt" {
     // V2 additions
     departmentId: string | null;
     employerId: string | null;
+    employerName: string | null;
     isUablAdmin: boolean;
     mustChangePassword: boolean;
   }

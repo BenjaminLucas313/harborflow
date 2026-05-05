@@ -415,14 +415,18 @@ model User {
 /// One Employer can have many EMPRESA User accounts.
 /// One Employer can create many GroupBookings across different trips.
 model Employer {
-  id        String   @id @default(cuid())
-  companyId String
-  name      String
+  id            String   @id @default(cuid())
+  companyId     String
+  name          String
   /// Optional tax ID (CUIT/NIT) for record-keeping.
-  taxId     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  taxId         String?
+  /// Name of the contact/representative for this employer.
+  representante String?
+  /// Contact phone number for this employer.
+  telefono      String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   company       Company        @relation(fields: [companyId], references: [id])
   /// EMPRESA users associated with this employer.

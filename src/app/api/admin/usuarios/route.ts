@@ -47,6 +47,7 @@ const CreateUserSchema = z.object({
   role:          z.enum(["UABL", "PROVEEDOR", "EMPRESA", "USUARIO", "CONDUCTOR"]),
   branchId:      z.string().optional(),
   departmentId:  z.string().optional(),
+  employerId:    z.string().optional(),
   isUablAdmin:   z.boolean().optional(),
   licenseNumber: z.string().optional(),
   phone:         z.string().optional(),
@@ -145,7 +146,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { email, firstName, lastName, role, branchId, departmentId, isUablAdmin, licenseNumber, phone } = parsed.data;
+    const { email, firstName, lastName, role, branchId, departmentId, employerId, isUablAdmin, licenseNumber, phone } = parsed.data;
     const { companyId } = session.user;
 
     // Find any existing user with this email (active or soft-deleted).
@@ -175,8 +176,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             lastName,
             role,
             passwordHash,
-            branchId:           branchId     || null,
+            branchId:           branchId    || null,
             departmentId:       departmentId || null,
+            employerId:         employerId   || null,
             isUablAdmin:        role === "UABL" ? (isUablAdmin ?? false) : false,
             mustChangePassword: true,
             isActive:           true,
@@ -254,6 +256,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           role,
           branchId:           branchId     || null,
           departmentId:       departmentId || null,
+          employerId:         employerId   || null,
           isUablAdmin:        role === "UABL" ? (isUablAdmin ?? false) : false,
           mustChangePassword: true,
         },

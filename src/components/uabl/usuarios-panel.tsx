@@ -2,7 +2,7 @@
 
 // UsuariosPanel — list of users + create/delete user actions for UABL admins.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2, UserCheck, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVibrate } from "@/hooks/useButtonAnimation";
@@ -24,6 +24,8 @@ type UserRow = {
   branch?:         { name: string } | null;
   department?:     { name: string } | null;
 };
+
+type EmployerOption = { id: string; name: string };
 
 type Branch = { id: string; name: string };
 type Dept   = { id: string; name: string };
@@ -75,15 +77,30 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
   const { className: vibrateClass, trigger: vibrateTrigger } = useVibrate();
 
   // Form state
-  const [email,         setEmail]         = useState("");
-  const [firstName,     setFirstName]     = useState("");
-  const [lastName,      setLastName]      = useState("");
-  const [role,          setRole]          = useState("UABL");
-  const [branchId,      setBranchId]      = useState("");
-  const [departmentId,  setDepartmentId]  = useState("");
-  const [isUablAdmin,   setIsUablAdmin]   = useState(false);
-  const [licenseNumber, setLicenseNumber] = useState("");
-  const [phone,         setPhone]         = useState("");
+  const [email,           setEmail]           = useState("");
+  const [firstName,       setFirstName]       = useState("");
+  const [lastName,        setLastName]        = useState("");
+  const [role,            setRole]            = useState("UABL");
+  const [branchId,        setBranchId]        = useState("");
+  const [departmentId,    setDepartmentId]    = useState("");
+  const [employerId,      setEmployerId]      = useState("");
+  const [employers,       setEmployers]       = useState<EmployerOption[]>([]);
+  const [employersLoaded, setEmployersLoaded] = useState(false);
+  const [isUablAdmin,     setIsUablAdmin]     = useState(false);
+  const [licenseNumber,   setLicenseNumber]   = useState("");
+  const [phone,           setPhone]           = useState("");
+
+  // Lazy-load employers list when a role that needs it is selected.
+  useEffect(() => {
+    if ((role !== "EMPRESA" && role !== "USUARIO") || employersLoaded) return;
+    fetch("/api/employers")
+      .then((r) => r.json())
+      .then((body: { data?: EmployerOption[] }) => {
+        setEmployers(body.data ?? []);
+        setEmployersLoaded(true);
+      })
+      .catch(() => {});
+  }, [role, employersLoaded]);
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -99,8 +116,9 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
         firstName,
         lastName,
         role,
-        branchId:      branchId      || undefined,
-        departmentId:  departmentId  || undefined,
+        branchId:      branchId     || undefined,
+        departmentId:  departmentId || undefined,
+        employerId:    (role === "EMPRESA" || role === "USUARIO") ? (employerId || undefined) : undefined,
         isUablAdmin:   role === "UABL" ? isUablAdmin : false,
         licenseNumber: role === "CONDUCTOR" ? (licenseNumber || undefined) : undefined,
         phone:         role === "CONDUCTOR" ? (phone         || undefined) : undefined,
@@ -127,8 +145,8 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
 
     // Reset form
     setEmail(""); setFirstName(""); setLastName("");
-    setRole("UABL"); setBranchId(""); setDepartmentId(""); setIsUablAdmin(false);
-    setLicenseNumber(""); setPhone("");
+    setRole("UABL"); setBranchId(""); setDepartmentId(""); setEmployerId("");
+    setIsUablAdmin(false); setLicenseNumber(""); setPhone("");
     setShowForm(false);
   }
 
@@ -268,6 +286,29 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
               />
               Administrador UABL (puede gestionar departamentos, tipos de trabajo y usuarios)
             </label>
+          )}
+
+          {(role === "EMPRESA" || role === "USUARIO") && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                {role === "EMPRESA" ? "Empresa" : "Empresa empleadora"}
+              </label>
+              <select
+                value={employerId}
+                onChange={(e) => setEmployerId(e.target.value)}
+                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">El usuario completará sus datos al primer login</option>
+                {employers.map((emp) => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
+              {employers.length === 0 && employersLoaded && (
+                <p className="text-xs text-muted-foreground">
+                  No hay empresas creadas aún. El usuario deberá configurarla al hacer login.
+                </p>
+              )}
+            </div>
           )}
 
           {role === "CONDUCTOR" && (

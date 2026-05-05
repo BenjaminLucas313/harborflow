@@ -11,9 +11,12 @@ import { NavUserMenu } from "@/components/layout/nav-user-menu";
 // ---------------------------------------------------------------------------
 
 type Props = {
-  firstName: string;
-  lastName: string;
-  role: string;
+  firstName:       string;
+  lastName:        string;
+  role:            string;
+  isUablAdmin?:    boolean;
+  departmentName?: string | null;
+  employerName?:   string | null;
   /** Company display name shown as user subtitle. */
   companyName?: string;
   /** The home link for this role (clicking the brand navigates here). */
@@ -35,6 +38,9 @@ export function AppNav({
   firstName,
   lastName,
   role,
+  isUablAdmin,
+  departmentName,
+  employerName,
   homeHref,
   assistantHref,
   perfilHref,
@@ -86,7 +92,15 @@ export function AppNav({
         {/* Right side: notifications + user menu */}
         <div className="flex items-center gap-3 ml-auto">
           <NotificacionesBell />
-          <NavUserMenu firstName={firstName} lastName={lastName} role={role} perfilHref={perfilHref} />
+          <NavUserMenu
+            firstName={firstName}
+            lastName={lastName}
+            role={role}
+            isUablAdmin={isUablAdmin}
+            departmentName={departmentName}
+            employerName={employerName}
+            perfilHref={perfilHref}
+          />
         </div>
 
       </div>

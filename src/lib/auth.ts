@@ -58,8 +58,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             isActive: true,
             // V2 additions
             departmentId: true,
-            employerId: true,
-            isUablAdmin: true,
+            employerId:   true,
+            employer:     { select: { name: true } },
+            isUablAdmin:  true,
             mustChangePassword: true,
           },
         });
@@ -76,16 +77,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // 5. Return the user object that Auth.js will embed in the JWT.
         //    passwordHash is intentionally excluded.
         return {
-          id: user.id,
-          email: user.email,
-          companyId: user.companyId,
-          branchId: user.branchId,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          departmentId: user.departmentId,
-          employerId: user.employerId,
-          isUablAdmin: user.isUablAdmin,
+          id:                 user.id,
+          email:              user.email,
+          companyId:          user.companyId,
+          branchId:           user.branchId,
+          firstName:          user.firstName,
+          lastName:           user.lastName,
+          role:               user.role,
+          departmentId:       user.departmentId,
+          employerId:         user.employerId,
+          employerName:       user.employer?.name ?? null,
+          isUablAdmin:        user.isUablAdmin,
           mustChangePassword: user.mustChangePassword,
         };
       },

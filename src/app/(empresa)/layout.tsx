@@ -16,7 +16,7 @@ export default async function EmpresaLayout({
     redirect(dashboardForRole(session.user.role));
   }
 
-  const { firstName, lastName, companyId } = session.user;
+  const { firstName, lastName, companyId, employerName } = session.user;
   const company = await prisma.company.findUnique({
     where:  { id: companyId },
     select: { name: true },
@@ -28,6 +28,7 @@ export default async function EmpresaLayout({
         firstName={firstName}
         lastName={lastName}
         role="EMPRESA"
+        employerName={employerName}
         companyName={company?.name}
         homeHref="/empresa"
       />

@@ -17,13 +17,26 @@ const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
   USUARIO:   { bg: "#1a2a1a", text: "#86efac" },
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  UABL:      "UABL",
-  EMPRESA:   "Empresa",
-  PROVEEDOR: "Proveedor",
-  CONDUCTOR: "Conductor",
-  USUARIO:   "Usuario",
-};
+function buildRoleLabel(opts: {
+  role:           string;
+  isUablAdmin:    boolean;
+  departmentName: string | null | undefined;
+  employerName:   string | null | undefined;
+}): string {
+  const { role, isUablAdmin, departmentName, employerName } = opts;
+  switch (role) {
+    case "UABL":
+      if (isUablAdmin) return "UABL Admin";
+      return departmentName ? `UABL · ${departmentName}` : "UABL";
+    case "EMPRESA":
+      return employerName ? `Coordinadora · ${employerName}` : "Coordinadora";
+    case "USUARIO":
+      return employerName ? `Empleado · ${employerName}` : "Empleado";
+    case "PROVEEDOR":  return "Proveedor";
+    case "CONDUCTOR":  return "Conductor";
+    default:           return role;
+  }
+}
 
 function getInitials(firstName: string, lastName: string): string {
   if (firstName && lastName) return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
@@ -77,9 +90,12 @@ function barStyle(index: 1 | 2 | 3, open: boolean): React.CSSProperties {
 // ---------------------------------------------------------------------------
 
 type Props = {
-  firstName:  string;
-  lastName:   string;
-  role:       string;
+  firstName:       string;
+  lastName:        string;
+  role:            string;
+  isUablAdmin?:    boolean;
+  departmentName?: string | null;
+  employerName?:   string | null;
   /** When provided, overrides the default /perfil href for the "Mi perfil" menu item. */
   perfilHref?: string;
 };
@@ -88,13 +104,13 @@ type Props = {
 // Component
 // ---------------------------------------------------------------------------
 
-export function NavUserMenu({ firstName, lastName, role, perfilHref }: Props) {
+export function NavUserMenu({ firstName, lastName, role, isUablAdmin, departmentName, employerName, perfilHref }: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const colors    = ROLE_COLORS[role] ?? { bg: "#1a3560", text: "#7eb8f5" };
   const initials  = getInitials(firstName, lastName);
-  const roleLabel = ROLE_LABELS[role] ?? role;
+  const roleLabel = buildRoleLabel({ role, isUablAdmin: isUablAdmin ?? false, departmentName, employerName });
 
   // Close on outside click
   useEffect(() => {

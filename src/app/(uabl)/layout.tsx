@@ -16,11 +16,13 @@ export default async function UablLayout({
     redirect(dashboardForRole(session.user.role));
   }
 
-  const { firstName, lastName, companyId } = session.user;
-  const company = await prisma.company.findUnique({
-    where:  { id: companyId },
-    select: { name: true },
-  });
+  const { firstName, lastName, companyId, departmentId, isUablAdmin } = session.user;
+  const [company, department] = await Promise.all([
+    prisma.company.findUnique({ where: { id: companyId }, select: { name: true } }),
+    departmentId
+      ? prisma.department.findUnique({ where: { id: departmentId }, select: { name: true } })
+      : null,
+  ]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -28,6 +30,8 @@ export default async function UablLayout({
         firstName={firstName}
         lastName={lastName}
         role="UABL"
+        isUablAdmin={isUablAdmin}
+        departmentName={department?.name}
         companyName={company?.name}
         homeHref="/uabl"
         assistantHref="/uabl/assistant"

@@ -93,6 +93,19 @@ export default auth((req) => {
   );
   if (isShared) return NextResponse.next();
 
+  // Onboarding guard: EMPRESA without employerId must complete setup first.
+  // Excluded paths: the onboarding page itself (to avoid redirect loops).
+  if (
+    role === "EMPRESA" &&
+    !session.user.employerId &&
+    !pathname.startsWith("/empresa/onboarding")
+  ) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = "/empresa/onboarding";
+    dest.search   = "";
+    return NextResponse.redirect(dest);
+  }
+
   // Protected route that doesn't belong to this role → redirect to own dashboard.
   if (!isAllowedPath(role, pathname)) {
     const dest = req.nextUrl.clone();
