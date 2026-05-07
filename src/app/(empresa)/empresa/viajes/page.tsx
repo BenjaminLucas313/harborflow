@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Ship, Users } from "lucide-react";
 import { ReservarViajeButton } from "@/components/empresa/reservar-viaje-button";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function EmpresaViajes() {
   const session = await auth();
@@ -67,10 +68,11 @@ export default async function EmpresaViajes() {
       )}
 
       {trips.length === 0 ? (
-        <div className="py-12 text-center space-y-2">
-          <Ship className="size-10 mx-auto text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">No hay viajes programados próximamente.</p>
-        </div>
+        <EmptyState
+          icon={Ship}
+          title="No hay viajes disponibles en este momento"
+          description="Contactá al proveedor si necesitás un transporte."
+        />
       ) : (
         <ul className="space-y-3">
           {trips.map((trip) => {

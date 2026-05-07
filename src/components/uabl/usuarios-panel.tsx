@@ -3,9 +3,10 @@
 // UsuariosPanel — list of users + create/delete user actions for UABL admins.
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, UserCheck, UserX } from "lucide-react";
+import { Plus, Trash2, UserCheck, UserX, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVibrate } from "@/hooks/useButtonAnimation";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -368,7 +369,13 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
         </div>
 
         {users.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-muted-foreground">No hay usuarios registrados.</p>
+          <EmptyState
+            icon={Users}
+            title="Sin usuarios creados"
+            actionLabel="Crear primer usuario"
+            onAction={() => setShowForm(true)}
+            className="px-5"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

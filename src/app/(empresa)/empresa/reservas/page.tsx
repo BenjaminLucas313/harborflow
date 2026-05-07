@@ -3,9 +3,10 @@ import { redirect }   from "next/navigation";
 import Link           from "next/link";
 import { auth }       from "@/lib/auth";
 import { prisma }     from "@/lib/prisma";
-import { Plus, ChevronRight } from "lucide-react";
+import { Plus, ChevronRight, ClipboardList } from "lucide-react";
 import { getPageParam, buildPaginationMeta, PAGE_SIZE } from "@/lib/pagination";
 import { Pagination } from "@/components/ui/Pagination";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type StatusCfg = { label: string; color: string };
 const STATUS_LABELS_DEFAULT: StatusCfg = { label: "Borrador", color: "bg-slate-100 text-slate-600" };
@@ -109,9 +110,12 @@ export default async function MisReservas({
       </div>
 
       {isEmpty && (
-        <div className="py-12 text-center text-sm text-muted-foreground">
-          Todavía no creaste ninguna reserva.
-        </div>
+        <EmptyState
+          icon={ClipboardList}
+          title="Aún no hiciste ninguna reserva"
+          actionLabel="Ver viajes"
+          actionHref="/empresa/viajes"
+        />
       )}
 
       {/* Próximas reservas */}

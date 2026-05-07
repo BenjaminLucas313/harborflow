@@ -3,8 +3,9 @@ import Link           from "next/link";
 import { auth }       from "@/lib/auth";
 import { prisma }     from "@/lib/prisma";
 import { SlotStatus } from "@prisma/client";
-import { Anchor, CalendarClock, ClipboardList, Clock, Users } from "lucide-react";
+import { Anchor, CalendarClock, ClipboardList, Clock, Users, Ship } from "lucide-react";
 import { InstallBanner } from "@/components/conductor/install-banner";
+import { EmptyState }    from "@/components/ui/EmptyState";
 
 const ARG_TZ = "America/Argentina/Buenos_Aires";
 
@@ -269,9 +270,11 @@ export default async function ConductorPage() {
       )}
 
       {upcoming.length === 0 && past.length === 0 && (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          No hay viajes registrados aún.
-        </div>
+        <EmptyState
+          icon={Ship}
+          title="No tenés viajes asignados todavía"
+          description="El proveedor te asignará a tu primer viaje cuando esté listo."
+        />
       )}
     </main>
   );

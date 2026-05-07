@@ -15,8 +15,27 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "HarborFlow",
-  description: "Plataforma de reservas y operaciones de lanchas",
+  title: { default: "HarborFlow", template: "%s · HarborFlow" },
+  description: "Sistema de gestión operativa portuaria",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  openGraph: {
+    title:       "HarborFlow",
+    description: "Sistema de gestión operativa portuaria",
+    url:         "/",
+    siteName:    "HarborFlow",
+    images:      [{ url: "/og-image.png", width: 1200, height: 630 }],
+    locale:      "es_AR",
+    type:        "website",
+  },
+  twitter: {
+    card:        "summary_large_image",
+    title:       "HarborFlow",
+    description: "Sistema de gestión operativa portuaria",
+  },
+  icons: {
+    icon:  "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default async function RootLayout({

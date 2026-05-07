@@ -11,9 +11,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, RefreshCw, User } from "lucide-react";
-import { DayDivider } from "@/components/ui/DayDivider";
-import { Pagination } from "@/components/ui/Pagination";
+import { ChevronDown, ChevronRight, RefreshCw, Ship, User } from "lucide-react";
+import { DayDivider }  from "@/components/ui/DayDivider";
+import { Pagination }  from "@/components/ui/Pagination";
+import { EmptyState }  from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -250,9 +251,12 @@ export function ViajesGrouped({ proximos, pasados, proximosMeta, pasadosMeta }: 
 
   if (proximos.length === 0 && pasados.length === 0) {
     return (
-      <div className="py-10 text-center text-sm text-muted-foreground">
-        No hay viajes registrados.
-      </div>
+      <EmptyState
+        icon={Ship}
+        title="Sin viajes creados aún"
+        actionLabel="Crear primer viaje"
+        actionHref="/proveedor/viajes/nuevo"
+      />
     );
   }
 

@@ -4,8 +4,10 @@ import Link             from "next/link";
 import { auth }         from "@/lib/auth";
 import { prisma }       from "@/lib/prisma";
 import { TripStatus }   from "@prisma/client";
+import { Ship }         from "lucide-react";
 import { getPageParam, buildPaginationMeta, PAGE_SIZE } from "@/lib/pagination";
 import { Pagination }   from "@/components/ui/Pagination";
+import { EmptyState }   from "@/components/ui/EmptyState";
 
 // Color coding for the seat grid cells.
 const SLOT_COLORS = {
@@ -99,9 +101,11 @@ export default async function UablViajes({
         </div>
 
         {trips.length === 0 && pageProximos === 1 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">
-            No hay viajes programados próximamente.
-          </div>
+          <EmptyState
+            icon={Ship}
+            title="Sin viajes registrados aún"
+            description="Los proveedores pueden crear viajes desde su panel."
+          />
         ) : (
           <ul className="space-y-4">
             {trips.map((trip) => {
