@@ -7,6 +7,8 @@ export default defineConfig({
     // Load .env before each test file so DATABASE_URL is available
     // for integration tests.
     setupFiles: ["dotenv/config"],
+    // Exclude Playwright E2E tests — they use @playwright/test, not vitest.
+    exclude: ["e2e/**", "node_modules/**"],
   },
   resolve: {
     alias: {

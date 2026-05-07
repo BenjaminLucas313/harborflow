@@ -16,7 +16,11 @@
     "usuarios:cargar": "tsx --env-file=.env src/scripts/cargar-usuarios-excel.ts",
     "usuarios:ejemplo": "tsx src/scripts/generar-ejemplo-usuarios.ts",
     "trips:migrar-rutas": "tsx --env-file=.env src/scripts/migrar-rutas-desde-trip-requests.ts",
-    "audit:cleanup": "cross-env tsx --env-file=.env -e \"fetch('http://localhost:3000/api/jobs/cleanup-audit-log',{method:'POST',headers:{'x-job-secret':process.env.JOB_SECRET??''}}).then(r=>r.json()).then(console.log)\""
+    "audit:cleanup": "cross-env tsx --env-file=.env -e \"fetch('http://localhost:3000/api/jobs/cleanup-audit-log',{method:'POST',headers:{'x-job-secret':process.env.JOB_SECRET??''}}).then(r=>r.json()).then(console.log)\"",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
@@ -63,6 +67,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
