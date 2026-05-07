@@ -271,7 +271,7 @@ export default async function ConductorPage() {
 
       {upcoming.length === 0 && past.length === 0 && (
         <EmptyState
-          icon={Ship}
+          icon={<Ship className="size-6 text-muted-foreground/50" aria-hidden="true" />}
           title="No tenés viajes asignados todavía"
           description="El proveedor te asignará a tu primer viaje cuando esté listo."
         />

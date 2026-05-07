@@ -1,11 +1,11 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
 
 type Props = {
-  icon?: LucideIcon;
+  icon?: ReactNode;
   title: string;
   description?: string;
   actionLabel?: string;
@@ -15,7 +15,7 @@ type Props = {
 };
 
 export function EmptyState({
-  icon: Icon,
+  icon,
   title,
   description,
   actionLabel,
@@ -25,9 +25,9 @@ export function EmptyState({
 }: Props) {
   return (
     <div className={cn("py-12 text-center space-y-4", className)}>
-      {Icon && (
+      {icon && (
         <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-muted">
-          <Icon className="size-6 text-muted-foreground/50" aria-hidden="true" />
+          {icon}
         </div>
       )}
       <div className="space-y-1.5">

@@ -252,7 +252,7 @@ export function ViajesGrouped({ proximos, pasados, proximosMeta, pasadosMeta }: 
   if (proximos.length === 0 && pasados.length === 0) {
     return (
       <EmptyState
-        icon={Ship}
+        icon={<Ship className="size-6 text-muted-foreground/50" aria-hidden="true" />}
         title="Sin viajes creados aún"
         actionLabel="Crear primer viaje"
         actionHref="/proveedor/viajes/nuevo"

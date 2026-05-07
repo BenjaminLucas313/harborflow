@@ -111,7 +111,7 @@ export default async function MisReservas({
 
       {isEmpty && (
         <EmptyState
-          icon={ClipboardList}
+          icon={<ClipboardList className="size-6 text-muted-foreground/50" aria-hidden="true" />}
           title="Aún no hiciste ninguna reserva"
           actionLabel="Ver viajes"
           actionHref="/empresa/viajes"

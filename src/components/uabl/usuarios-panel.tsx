@@ -370,7 +370,7 @@ export function UsuariosPanel({ users: initial, branches, departments, currentUs
 
         {users.length === 0 ? (
           <EmptyState
-            icon={Users}
+            icon={<Users className="size-6 text-muted-foreground/50" aria-hidden="true" />}
             title="Sin usuarios creados"
             actionLabel="Crear primer usuario"
             onAction={() => setShowForm(true)}

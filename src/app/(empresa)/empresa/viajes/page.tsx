@@ -69,7 +69,7 @@ export default async function EmpresaViajes() {
 
       {trips.length === 0 ? (
         <EmptyState
-          icon={Ship}
+          icon={<Ship className="size-6 text-muted-foreground/50" aria-hidden="true" />}
           title="No hay viajes disponibles en este momento"
           description="Contactá al proveedor si necesitás un transporte."
         />

@@ -102,7 +102,7 @@ export default async function UablViajes({
 
         {trips.length === 0 && pageProximos === 1 ? (
           <EmptyState
-            icon={Ship}
+            icon={<Ship className="size-6 text-muted-foreground/50" aria-hidden="true" />}
             title="Sin viajes registrados aún"
             description="Los proveedores pueden crear viajes desde su panel."
           />
