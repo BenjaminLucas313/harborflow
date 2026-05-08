@@ -456,60 +456,59 @@ async function main() {
         tripId:     trip1.id,
         employerId: empleadorConstructora.id,
         bookedById: empresaConstructora.id,
-        status:     "SUBMITTED", // already submitted → UABL can review
+        status:     "SUBMITTED",
         notes:      "Turno regular — cuadrilla de carga y mantenimiento",
       },
     });
     console.log(`✓ GroupBooking: SUBMITTED (id: ${groupBooking.id})`);
-
-    // Slot 1: Juan Pérez — CARGA (routes to Operaciones)
-    const wtCarga = workTypes["CARGA"]!;
-    const juanId  = createdUsers["usuario.juan"]!.id;
-    const slot1Exists = await prisma.passengerSlot.findUnique({
-      where: { tripId_usuarioId: { tripId: trip1.id, usuarioId: juanId } },
-    });
-    if (!slot1Exists) {
-      await prisma.passengerSlot.create({
-        data: {
-          companyId:         company.id,
-          groupBookingId:    groupBooking.id,
-          tripId:            trip1.id,
-          branchId:          branch.id,
-          usuarioId:         juanId,
-          workTypeId:        wtCarga.id,
-          departmentId:      wtCarga.departmentId,
-          representedCompany: "Constructora Norte S.A.",
-          status:            "PENDING",
-        },
-      });
-      console.log(`✓ Slot 1     : Juan Pérez — CARGA → Operaciones (PENDING)`);
-    }
-
-    // Slot 2: María García — MANT_EL (routes to Mantenimiento)
-    const wtMantEl = workTypes["MANT_EL"]!;
-    const mariaId  = createdUsers["usuario.maria"]!.id;
-    const slot2Exists = await prisma.passengerSlot.findUnique({
-      where: { tripId_usuarioId: { tripId: trip1.id, usuarioId: mariaId } },
-    });
-    if (!slot2Exists) {
-      await prisma.passengerSlot.create({
-        data: {
-          companyId:         company.id,
-          groupBookingId:    groupBooking.id,
-          tripId:            trip1.id,
-          branchId:          branch.id,
-          usuarioId:         mariaId,
-          workTypeId:        wtMantEl.id,
-          departmentId:      wtMantEl.departmentId,
-          representedCompany: "Constructora Norte S.A.",
-          status:            "PENDING",
-        },
-      });
-      console.log(`✓ Slot 2     : María García — MANT_EL → Mantenimiento (PENDING)`);
-    }
   } else {
+    // Reset to SUBMITTED so re-seeding always starts from a reviewable state.
+    await prisma.groupBooking.update({
+      where: { id: groupBooking.id },
+      data:  { status: "SUBMITTED" },
+    });
     console.log(`✓ GroupBooking: already exists (id: ${groupBooking.id})`);
   }
+
+  // Slots are upserted outside the GroupBooking branch so re-seeding always
+  // resets them to PENDING — critical for test repeatability.
+  const wtCarga = workTypes["CARGA"]!;
+  const juanId  = createdUsers["usuario.juan"]!.id;
+  await prisma.passengerSlot.upsert({
+    where:  { tripId_usuarioId: { tripId: trip1.id, usuarioId: juanId } },
+    update: { status: "PENDING" },
+    create: {
+      companyId:          company.id,
+      groupBookingId:     groupBooking.id,
+      tripId:             trip1.id,
+      branchId:           branch.id,
+      usuarioId:          juanId,
+      workTypeId:         wtCarga.id,
+      departmentId:       wtCarga.departmentId,
+      representedCompany: "Constructora Norte S.A.",
+      status:             "PENDING",
+    },
+  });
+  console.log(`✓ Slot 1     : Juan Pérez — CARGA → Operaciones (PENDING)`);
+
+  const wtMantEl = workTypes["MANT_EL"]!;
+  const mariaId  = createdUsers["usuario.maria"]!.id;
+  await prisma.passengerSlot.upsert({
+    where:  { tripId_usuarioId: { tripId: trip1.id, usuarioId: mariaId } },
+    update: { status: "PENDING" },
+    create: {
+      companyId:          company.id,
+      groupBookingId:     groupBooking.id,
+      tripId:             trip1.id,
+      branchId:           branch.id,
+      usuarioId:          mariaId,
+      workTypeId:         wtMantEl.id,
+      departmentId:       wtMantEl.departmentId,
+      representedCompany: "Constructora Norte S.A.",
+      status:             "PENDING",
+    },
+  });
+  console.log(`✓ Slot 2     : María García — MANT_EL → Mantenimiento (PENDING)`);
 
   // ── 11. Sample TripRequests ───────────────────────────────────────────────
   // One PENDING request from each EMPRESA user — exercises the on-demand

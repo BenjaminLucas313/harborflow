@@ -1,7 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { loginAs } from './helpers/auth'
+import { seedDatabase } from './helpers/db'
 
 test.describe('EMPRESA — Reserva grupal', () => {
+  // Re-seed so trips have future departure times relative to today.
+  test.beforeAll(async () => {
+    await seedDatabase()
+  })
+
   test.beforeEach(async ({ page }) => {
     await loginAs(page, 'empresa')
   })

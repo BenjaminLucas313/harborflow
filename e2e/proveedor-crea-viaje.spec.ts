@@ -25,15 +25,15 @@ test.describe('PROVEEDOR — Crear viaje', () => {
     // Puerto — pre-selected with branches[0] (Puerto Rosario in seed)
     // No action needed unless the select has no default.
 
-    // Embarcación — required
+    // Embarcación — required. Select the first real option (index 1 skips the placeholder).
     await page
       .locator('label:has-text("Embarcación") + select')
-      .selectOption({ label: /Lancha Río Grande/ })
+      .selectOption({ index: 1 })
 
-    // Conductor — optional but helps verify the slot is connected to Horacio Ríos
+    // Conductor — selectOption accepts only plain strings, not RegExp.
     await page
       .locator('label:has-text("Conductor") + select')
-      .selectOption({ label: /Horacio Ríos/ })
+      .selectOption({ label: 'Horacio Ríos' })
 
     // Salida — required, 3 days from now at 16:00
     const departure = futureDatetime(3, 16, 0)
