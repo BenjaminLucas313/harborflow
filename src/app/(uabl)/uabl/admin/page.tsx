@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { Building2, Wrench, Users } from "lucide-react";
+import { Building2, Wrench, Users, Settings } from "lucide-react";
 
 export default async function UablAdmin() {
   const session = await auth();
@@ -77,6 +77,23 @@ export default async function UablAdmin() {
           </div>
           <p className="text-xs text-muted-foreground">
             Creá usuarios UABL, PROVEEDOR y EMPRESA. Los usuarios creados aquí reciben sus credenciales directamente.
+          </p>
+        </Link>
+        <Link
+          href="/uabl/admin/configuracion"
+          className="rounded-2xl border border-border bg-card p-6 space-y-3 hover:shadow-sm transition-shadow group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-orange-100 p-2.5">
+              <Settings className="size-5 text-orange-700" />
+            </div>
+            <div>
+              <p className="font-semibold group-hover:text-primary transition-colors">Configuración</p>
+              <p className="text-sm text-muted-foreground">Email admin y ajustes generales</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Configurá el email del administrador para recibir el resumen mensual consolidado de operaciones.
           </p>
         </Link>
       </div>

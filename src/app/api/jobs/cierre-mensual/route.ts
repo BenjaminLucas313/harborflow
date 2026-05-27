@@ -9,7 +9,8 @@
 //   C. Snapshots          — generate SnapshotMensual per active company.
 //   D. Informe narrativo  — AI executive brief via Claude (per company).
 //   E. Emails             — send monthly department summaries (per company).
-//   F. Audit log          — record CIERRE_MENSUAL_COMPLETADO.
+//   F. Admin email        — send consolidated admin report (per company).
+//   G. Audit log          — record CIERRE_MENSUAL_COMPLETADO.
 //
 // SECURITY
 // --------
@@ -31,6 +32,7 @@
 //       snapshotsGenerados: number,
 //       informesGenerados: number,
 //       emailsEnviados: number, emailsOmitidos: number, emailsErrores: number,
+//       emailsAdminEnviados: number,
 //       errores: string[]   // non-fatal errors encountered during processing
 //     }
 //   }
@@ -50,7 +52,7 @@ import { logAction }                 from "@/modules/audit/repository";
 import { calcularDistribucionViaje } from "@/services/liquidacion.service";
 import { generarSnapshotMensual }    from "@/services/snapshot.service";
 import { generarInformeNarrativo }   from "@/services/informe.service";
-import { enviarResumenMensualEmpresa } from "@/services/email.service";
+import { enviarResumenMensualEmpresa, generarYEnviarResumenAdmin } from "@/services/email.service";
 
 // Argentina: UTC-3, no DST
 const ARG_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -228,9 +230,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   console.log(`${tag} PASO E: ${emailsEnviados} sent, ${emailsOmitidos} skipped, ${emailsErrores} errors.`);
 
   // ─────────────────────────────────────────────────────────────────────────
-  // PASO F — Registrar en AuditLog (per company, best-effort)
+  // PASO F — Email consolidado al administrador (per company, best-effort)
   // ─────────────────────────────────────────────────────────────────────────
-  const payload = { mes, anio, viajesLiquidados, snapshotsGenerados, informesGenerados, emailsEnviados, errores: errores.length };
+  let emailsAdminEnviados = 0;
+  console.log(`${tag} PASO F: sending admin consolidated emails.`);
+
+  for (const company of companies) {
+    try {
+      await generarYEnviarResumenAdmin(company.id, mes, anio);
+      emailsAdminEnviados++;
+    } catch (err) {
+      const msg = `Admin email ${company.name}: ${err instanceof Error ? err.message : String(err)}`;
+      errores.push(msg);
+      console.error(`${tag} ${msg}`);
+      Sentry.captureException(err, { tags: { job: "cierre-mensual", step: "email-admin" }, extra: { companyId: company.id } });
+    }
+  }
+
+  console.log(`${tag} PASO F: ${emailsAdminEnviados}/${companies.length} admin emails sent.`);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PASO G — Registrar en AuditLog (per company, best-effort)
+  // ─────────────────────────────────────────────────────────────────────────
+  const payload = { mes, anio, viajesLiquidados, snapshotsGenerados, informesGenerados, emailsEnviados, emailsAdminEnviados, errores: errores.length };
 
   await Promise.allSettled(
     companies.map((company) =>
@@ -245,7 +267,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ),
   );
 
-  console.log(`${tag} DONE — ${viajesLiquidados} liquidados, ${snapshotsGenerados} snapshots, ${informesGenerados} informes, ${emailsEnviados} emails. ${errores.length} non-fatal errors.`);
+  console.log(`${tag} DONE — ${viajesLiquidados} liquidados, ${snapshotsGenerados} snapshots, ${informesGenerados} informes, ${emailsEnviados} dept emails, ${emailsAdminEnviados} admin emails. ${errores.length} non-fatal errors.`);
 
   return NextResponse.json({
     data: {
@@ -257,6 +279,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       emailsEnviados,
       emailsOmitidos,
       emailsErrores,
+      emailsAdminEnviados,
       errores,
     },
   });

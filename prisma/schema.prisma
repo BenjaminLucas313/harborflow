@@ -206,6 +206,8 @@ enum AuditAction {
   SALIDA_CONFIRMADA
   // ── V2: Monthly close ─────────────────────────────────────────────────────
   CIERRE_MENSUAL_COMPLETADO
+  // ── V2: Company configuration ─────────────────────────────────────────────
+  COMPANY_CONFIG_UPDATED
 }
 
 /// Status lifecycle for on-demand boat requests submitted by EMPRESA.
@@ -261,11 +263,12 @@ enum ViajeStatus {
 
 /// Top-level tenant. All tenant-owned entities carry companyId.
 model Company {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  logoUrl   String?
-  isActive  Boolean  @default(true)
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String   @unique
+  logoUrl              String?
+  emailAdministrador   String?
+  isActive             Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

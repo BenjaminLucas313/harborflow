@@ -20,7 +20,11 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "email:test": "tsx --env-file=.env src/scripts/test-email-mensual.ts",
+    "email:preview": "tsx --env-file=.env src/scripts/preview-email-mensual.tsx",
+    "email:test:admin": "tsx --env-file=.env src/scripts/test-email-admin.ts",
+    "email:preview:admin": "tsx src/scripts/preview-email-admin.tsx"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",

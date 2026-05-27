@@ -16,6 +16,7 @@ import { BienvenidaEmail }                from "@/emails/BienvenidaEmail";
 import { ResetPasswordEmail }            from "@/emails/ResetPasswordEmail";
 import { ConductorEmail }               from "@/emails/ConductorEmail";
 import { EmailMensualDepartamento }     from "@/emails/EmailMensualDepartamento";
+import { EmailMensualAdmin }            from "@/emails/EmailMensualAdmin";
 import { prisma }                        from "@/lib/prisma";
 
 // ---------------------------------------------------------------------------
@@ -335,6 +336,266 @@ export async function enviarResumenMensualEmpresa(
   }
 
   return { enviados, omitidos, errores };
+}
+
+// ---------------------------------------------------------------------------
+// sendEmailMensualAdmin
+// ---------------------------------------------------------------------------
+
+export interface EmailMensualAdminParams {
+  mes:          string;
+  companyName:  string;
+  emailDestino: string;
+  kpis: {
+    totalViajes:        number;
+    variacionViajes:    number;
+    ocupacionPromedio:  number;
+    variacionOcupacion: number;
+    totalPasajeros:     number;
+    variacionPasajeros: number;
+    asientosLiquidados: number;
+  };
+  departamentos: Array<{
+    name:           string;
+    viajes:         number;
+    asientosUsados: number;
+    asientosVacios: number;
+    total:          number;
+  }>;
+  destacados: {
+    masViajes:      { name: string; viajes: number; asientos: number };
+    mejorOcupacion: { name: string; ocupacion: number };
+  };
+  operacion: {
+    lanchasActivas: number;
+    conductores:    number;
+    cancelaciones:  number;
+  };
+}
+
+export async function sendEmailMensualAdmin(params: EmailMensualAdminParams): Promise<void> {
+  const { login, key, from, hasBrevo, isDev } = getConfig();
+
+  console.log(
+    "[email:mensual-admin] called — hasBrevo:", hasBrevo,
+    "| isDev:", isDev,
+    "| to:", params.emailDestino,
+  );
+
+  if (!hasBrevo) {
+    if (isDev) {
+      console.log("[email:mensual-admin] DEV MOCK (no BREVO credentials configured)");
+      console.log("  → destino:       ", params.emailDestino);
+      console.log("  → mes:           ", params.mes);
+      console.log("  → totalViajes:   ", params.kpis.totalViajes);
+      console.log("  → departamentos: ", params.departamentos.length);
+    } else {
+      console.error("[email:mensual-admin] ERROR: BREVO credentials not set in production!");
+    }
+    return;
+  }
+
+  try {
+    const html = await render(
+      EmailMensualAdmin({
+        mes:           params.mes,
+        companyName:   params.companyName,
+        kpis:          params.kpis,
+        departamentos: params.departamentos,
+        destacados:    params.destacados,
+        operacion:     params.operacion,
+      }),
+    );
+
+    const transporter = makeTransporter(login, key);
+    await transporter.sendMail({
+      from,
+      to:      params.emailDestino,
+      subject: `Resumen mensual de operaciones — ${params.mes} — ${params.companyName}`,
+      html,
+    });
+
+    console.log("[email:mensual-admin] ✓ sent →", params.emailDestino);
+  } catch (err) {
+    console.error("[email:mensual-admin] ✗ SMTP error:", err);
+    Sentry.captureException(err, {
+      tags:  { service: "email", type: "mensual-admin" },
+      extra: { to: params.emailDestino, mes: params.mes },
+    });
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// generarYEnviarResumenAdmin
+// ---------------------------------------------------------------------------
+//
+// Orchestrates the admin consolidated email for one company:
+//   1. Checks emailAdministrador — skips if not configured.
+//   2. Loads current and previous SnapshotMensual for KPI deltas.
+//   3. Aggregates AsientoLiquidacion by dept for the detail table.
+//   4. Counts distinct boats/drivers from Trip for the operación section.
+//   5. Calls sendEmailMensualAdmin().
+
+function argPeriodRange(mes: number, anio: number): { from: Date; to: Date } {
+  return {
+    from: new Date(Date.UTC(anio, mes - 1, 1, 3, 0, 0, 0)),
+    to:   new Date(Date.UTC(anio, mes,     1, 2, 59, 59, 999)),
+  };
+}
+
+export async function generarYEnviarResumenAdmin(
+  companyId: string,
+  mes:       number,
+  anio:      number,
+): Promise<void> {
+  const mesLabel = `${MONTH_NAMES_EMAIL[mes - 1] ?? `Mes ${mes}`} ${anio}`;
+  const prev     = prevMonthEmail(mes, anio);
+  const { from: periodFrom, to: periodTo } = argPeriodRange(mes, anio);
+
+  // 1. Company + emailAdministrador
+  const company = await prisma.company.findUnique({
+    where:  { id: companyId },
+    select: { name: true, emailAdministrador: true },
+  });
+
+  if (!company?.emailAdministrador) {
+    console.log(`[email:admin] Sin emailAdministrador en company ${companyId}, saltando.`);
+    return;
+  }
+
+  // 2. Snapshots (current + previous for deltas)
+  const [snapshot, prevSnapshot] = await Promise.all([
+    prisma.snapshotMensual.findUnique({
+      where: { companyId_mes_anio: { companyId, mes, anio } },
+    }),
+    prisma.snapshotMensual.findUnique({
+      where: { companyId_mes_anio: { companyId, mes: prev.mes, anio: prev.anio } },
+    }),
+  ]);
+
+  if (!snapshot) {
+    console.warn(`[email:admin] No snapshot para ${companyId} ${mes}/${anio}. Saltando.`);
+    return;
+  }
+
+  // 3. AsientoLiquidacion grouped by dept
+  const liquidaciones = await prisma.asientoLiquidacion.findMany({
+    where:  { companyId, mes, anio },
+    select: {
+      departamentoId:     true,
+      viajeId:            true,
+      asientosReservados: true,
+      fraccionVacios:     true,
+      totalAsientos:      true,
+    },
+  });
+
+  // 4. Dept names
+  const deptIds = [...new Set(liquidaciones.map((l) => l.departamentoId))];
+  const depts   = await prisma.department.findMany({
+    where:  { id: { in: deptIds } },
+    select: { id: true, name: true },
+  });
+  const deptName = new Map(depts.map((d) => [d.id, d.name]));
+
+  type DeptAgg = {
+    name:           string;
+    viajeIds:       Set<string>;
+    asientosUsados: number;
+    asientosVacios: number;
+    total:          number;
+  };
+  const deptMap = new Map<string, DeptAgg>();
+
+  for (const liq of liquidaciones) {
+    const name = deptName.get(liq.departamentoId) ?? liq.departamentoId;
+    const agg  = deptMap.get(liq.departamentoId) ??
+      { name, viajeIds: new Set<string>(), asientosUsados: 0, asientosVacios: 0, total: 0 };
+    agg.viajeIds.add(liq.viajeId);
+    agg.asientosUsados += liq.asientosReservados;
+    agg.asientosVacios += Number(liq.fraccionVacios);
+    agg.total          += Number(liq.totalAsientos);
+    deptMap.set(liq.departamentoId, agg);
+  }
+
+  const departamentos = [...deptMap.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((d) => ({
+      name:           d.name,
+      viajes:         d.viajeIds.size,
+      asientosUsados: d.asientosUsados,
+      asientosVacios: Math.round(d.asientosVacios * 100) / 100,
+      total:          Math.round(d.total          * 100) / 100,
+    }));
+
+  // 5. Distinct boats and drivers from trips in period
+  const tripsInPeriod = await prisma.trip.findMany({
+    where:  { companyId, departureTime: { gte: periodFrom, lte: periodTo } },
+    select: { boatId: true, driverId: true },
+  });
+  const lanchasActivas = new Set(tripsInPeriod.map((t) => t.boatId).filter(Boolean)).size;
+  const conductores    = new Set(tripsInPeriod.map((t) => t.driverId).filter(Boolean)).size;
+
+  // 6. KPIs
+  const curOcup  = parseFloat(snapshot.promedioOcupacion.toString());
+  const prevOcup = prevSnapshot ? parseFloat(prevSnapshot.promedioOcupacion.toString()) : undefined;
+  const curPax   = parseFloat(snapshot.totalAsientosOcupados.toString());
+  const prevPax  = prevSnapshot ? parseFloat(prevSnapshot.totalAsientosOcupados.toString()) : 0;
+  const asientosLiquidados = departamentos.reduce((s, d) => s + d.total, 0);
+
+  const kpis: EmailMensualAdminParams["kpis"] = {
+    totalViajes:        snapshot.totalViajes,
+    variacionViajes:    prevSnapshot ? snapshot.totalViajes - prevSnapshot.totalViajes : 0,
+    ocupacionPromedio:  curOcup,
+    variacionOcupacion: prevOcup !== undefined
+      ? Math.round((curOcup - prevOcup) * 10000) / 100
+      : 0,
+    totalPasajeros:     Math.round(curPax),
+    variacionPasajeros: prevSnapshot ? Math.round(curPax - prevPax) : 0,
+    asientosLiquidados: Math.round(asientosLiquidados * 100) / 100,
+  };
+
+  // 7. Destacados
+  const byViajes      = [...departamentos].sort((a, b) => b.viajes - a.viajes);
+  const masViajesDept = byViajes[0];
+
+  const mejorOcupDept = departamentos.length > 0
+    ? departamentos.reduce((best, d) => {
+        const t  = d.asientosUsados + d.asientosVacios;
+        const o  = t  > 0 ? d.asientosUsados    / t  : 0;
+        const bt = best.asientosUsados + best.asientosVacios;
+        const bo = bt > 0 ? best.asientosUsados  / bt : 0;
+        return o > bo ? d : best;
+      })
+    : null;
+
+  const destacados: EmailMensualAdminParams["destacados"] = {
+    masViajes: {
+      name:     masViajesDept?.name           ?? "—",
+      viajes:   masViajesDept?.viajes         ?? 0,
+      asientos: masViajesDept?.asientosUsados ?? 0,
+    },
+    mejorOcupacion: {
+      name:     mejorOcupDept?.name ?? "—",
+      ocupacion: mejorOcupDept
+        ? (() => {
+            const t = mejorOcupDept.asientosUsados + mejorOcupDept.asientosVacios;
+            return t > 0 ? Math.round((mejorOcupDept.asientosUsados / t) * 10000) / 100 : 0;
+          })()
+        : 0,
+    },
+  };
+
+  await sendEmailMensualAdmin({
+    mes:           mesLabel,
+    companyName:   company.name,
+    emailDestino:  company.emailAdministrador,
+    kpis,
+    departamentos,
+    destacados,
+    operacion: { lanchasActivas, conductores, cancelaciones: snapshot.cancelaciones },
+  });
 }
 
 // ---------------------------------------------------------------------------
